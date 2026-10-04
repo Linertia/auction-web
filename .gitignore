@@ -4,6 +4,7 @@
 !.vercelignore
 !.gitattributes
 !README.md
+!README.zh-CN.md
 !index.py
 !pyproject.toml
 !requirements.txt

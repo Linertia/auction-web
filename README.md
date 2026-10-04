@@ -1,5 +1,7 @@
 # auction-web
 
+[中文说明](README.zh-CN.md) | English
+
 Private, read-only auction snapshot website, REST API and Streamable HTTP MCP.
 The production collector remains elsewhere. No snapshots, databases, account
 data, credentials, environment files or production configuration belong here.
