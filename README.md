@@ -1,0 +1,97 @@
+# auction-web
+
+Private, read-only auction snapshot website, REST API and Streamable HTTP MCP.
+The production collector remains elsewhere. No snapshots, databases, account
+data, credentials, environment files or production configuration belong here.
+
+## Vercel Git import
+
+Import the private GitHub repository. Choose the repository root (`.`) as Root
+Directory and the FastAPI framework preset. Keep Build Command, Install Command
+and Output Directory at their framework defaults. Python 3.12 is declared in
+`pyproject.toml`; `index.py` exports the ASGI `app`. Dependencies are installed
+from `requirements.txt`. The function deadline is 30 seconds.
+
+The webpage is rendered by the function, not a public source/static directory.
+Never publish Python source or application configuration as browser assets.
+
+## Server-side environment configuration
+
+Configure these in the Vercel dashboard for production and, if required, preview.
+Do not use public/client-side variable prefixes. Do not add values to this repo.
+
+| Variable | Value / purpose |
+| --- | --- |
+| `AUCTION_PUBLIC_URL` | Fixed HTTPS website origin, no trailing slash or `/mcp` |
+| `AUCTION_SNAPSHOT_BACKEND` | `s3` |
+| `AUCTION_SERVER_IDS` | Authorized server IDs as JSON, e.g. `["local"]` |
+| `AUCTION_S3_BUCKET` | Private bucket name |
+| `AUCTION_S3_PREFIX` | `auction` |
+| `AWS_REGION` | Bucket region |
+| `AWS_ACCESS_KEY_ID` | Dedicated read-only identity, GetObject only |
+| `AWS_SECRET_ACCESS_KEY` | Dedicated read-only identity secret |
+| `AWS_SESSION_TOKEN` | Required only for temporary AWS credentials |
+| `AUCTION_AUTH_USERS_JSON` | Per-user SHA-256 Bearer hashes and authorized server IDs |
+| `UPSTASH_REDIS_REST_URL` | HTTPS Redis REST endpoint |
+| `UPSTASH_REDIS_REST_TOKEN` | Redis control identity for rate limiting and audit |
+
+Bearer whitelist schema: each user ID maps to an object containing `sha256`
+(64 hex characters), `servers` (authorized IDs), and optional `expires_at`
+(Unix seconds). Generate strong per-user credentials outside this repository;
+only their hashes are configured in the server. Never include the actual token
+in a URL, command argument, commit, browser storage or log.
+
+For external OAuth instead of the private Bearer whitelist, additionally set
+`AUCTION_OAUTH_ISSUER`, `AUCTION_OAUTH_JWKS_URL`, and
+`AUCTION_OAUTH_GRANTS_JSON` (subject IDs mapped to authorized server ID lists).
+The external identity provider must issue RS256 tokens with scope `auction:read`
+and audience `<AUCTION_PUBLIC_URL>/mcp`. This repository is not an OAuth issuer.
+
+Read-only S3 objects must already be published:
+
+```
+auction/objects/<SHA256>.json
+auction/<server_id>/<trade_date>/<stage>/latest.json
+```
+
+The pointer contains only `{"sha256":"<content hash>"}`. The object is the
+existing sanitized metadata/CSV bundle. Final and corrected stages are separate.
+Do not grant the website ListBucket, PutObject or DeleteObject permissions.
+The separate local publisher must not share its write credentials with Vercel.
+Redis needs the existing rate-limit EVAL (INCR/EXPIRE) and audit XADD permissions.
+
+## First deployment verification
+
+1. Check Vercel reports READY. Missing configuration must fail closed, not
+   silently enable anonymous access or fall back to a local production disk.
+2. Open `/` on another computer; the query form should load without exposing
+   credentials, strategy formulas or Python files.
+3. POST `/api/auction/rank` without authentication: expect 401. With a separately
+   supplied authorized Bearer header and JSON body
+   `{"trade_date":"20260930","server_id":"local","stage":"final","limit":3}`,
+   expect 200 only after that exact snapshot has been published to S3. Compare
+   codes, ranks, scores and qualification with the original local query result.
+4. Use an MCP client at `/mcp`: initialize, tools/list, tools/call. The only tool
+   must be `rank_auction_candidates`; its result must match the REST response
+   except the per-request request ID.
+5. Verify invalid dates/codes, unauthorized server IDs, and rate limits are
+   rejected. Confirm Redis audit events exist without tokens or raw results.
+   Audit or Redis failure must refuse data delivery.
+
+Use the stable public origin for MCP requests. Preview origins may need a
+separate `AUCTION_PUBLIC_URL`; platform deployment protection can independently
+require Vercel login. Do not disable application authentication to bypass it.
+
+## Code provenance and boundaries
+
+`AuctionRankingReader.rank_auction_candidates()` remains the single query
+entry. REST and MCP call it without running new scoring or qualification.
+`auction_monitor.py` contains only the original AuctionFeature dataclass and
+Shanghai timezone; `auction_monitor_v2.py` contains only the original ranking
+function. These definitions are retained verbatim from the existing project.
+Collectors, provider clients and strategy calculation modules are omitted.
+The source research repository and its local stdio entrypoint are unchanged.
+
+The FastAPI layout matches https://vercel.com/docs/frameworks/backend/fastapi .
+Local import/protocol checks do not prove a cloud deployment is operational:
+cloud build, S3/Redis permissions and cross-device access require live testing.
