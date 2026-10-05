@@ -49,7 +49,7 @@ class WebQueryService:
 
     async def execute(self, trade_date: str, server_id: str = "local", stage="final",
                       limit: int = 30, offset: int = 0, codes: list[str] | None = None,
-                      qualified_only: bool = False) -> dict:
+                      qualified_only: bool = False, *, display: bool = False) -> dict:
         principal = principal_context.get()
         rid = request_context.get() or uuid.uuid4().hex
         args = [trade_date, server_id, stage, limit, offset, codes, qualified_only]
@@ -63,7 +63,11 @@ class WebQueryService:
             if not self.slots.acquire(blocking=False):
                 raise AuctionQueryError("QUERY_BUSY: 查询繁忙，请稍后重试")
             try:
-                future = self.pool.submit(self.reader.rank_auction_candidates, *args)
+                if display:
+                    from .auction_display import read_display
+                    future = self.pool.submit(read_display, self.reader, *args)
+                else:
+                    future = self.pool.submit(self.reader.rank_auction_candidates, *args)
             except Exception:
                 self.slots.release()
                 raise
@@ -98,7 +102,7 @@ class AccessBoundary:
         if path == "/" or path.startswith("/.well-known/oauth-protected-resource"):
             return await self.app(scope, receive, send)
         rid = uuid.uuid4().hex
-        if path not in ("/api/auction/rank", "/mcp", "/mcp/"):
+        if path not in ("/api/auction/rank", "/api/auction/view", "/mcp", "/mcp/"):
             return await error_response("NOT_FOUND",rid,404)(scope,receive,send)
         headers = dict(scope.get("headers",[]))
         principal = None
@@ -217,6 +221,16 @@ def create_app(reader, auth, *, limiter=None, audit=None, timeout=8.0,
         return HTMLResponse(Path(__file__).with_name("auction_web.html").read_text(encoding="utf-8"),
             headers={"Content-Security-Policy":"default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'",
                      "Cache-Control":"no-store"})
+
+    @app.post("/api/auction/view")
+    async def view(request: Request):
+        try:
+            args = await request.json()
+            if not isinstance(args,dict) or set(args) - PARAMETERS or "trade_date" not in args:
+                raise ValueError()
+        except (ValueError, TypeError):
+            raise AuctionQueryError("PARAMETERS_INVALID: 参数或JSON无效") from None
+        return await service.execute(**args,display=True)
 
     @app.get("/.well-known/oauth-protected-resource")
     @app.get("/.well-known/oauth-protected-resource/mcp")

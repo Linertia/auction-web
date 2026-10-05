@@ -240,8 +240,12 @@ class SupabaseSnapshotStore:
             # Refuse unsanitized metadata/CSV even if their content hash is valid.
             from .auction_query import PUBLIC_NUMBERS
             metadata = json.loads(raw_meta)
-            if not isinstance(metadata, dict) or set(metadata) != {"cycle_id", "observed_at", "data_healthy"}:
+            required = {"cycle_id", "observed_at", "data_healthy"}
+            if not isinstance(metadata, dict) or not required <= set(metadata) or set(metadata) - required - {"display"}:
                 raise ValueError()
+            if "display" in metadata:
+                from .auction_display import validate_display
+                validate_display(metadata["display"])
             columns = csv.DictReader(io.StringIO(raw_rows.decode("utf-8-sig"))).fieldnames
             expected = {"cycle_id", "observed_at", "code", "rank", "qualified", *PUBLIC_NUMBERS}
             if columns is None or set(columns) != expected or len(columns) != len(expected):
