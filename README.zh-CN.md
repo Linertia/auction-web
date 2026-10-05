@@ -47,6 +47,9 @@ Vercel 与本机发布器建议使用分别命名、可独立撤销的 secret，
 网站应用只提供读取；密钥泄露仍可能写入。严格权限隔离需要另行配置 Auth/JWT+Storage RLS，
 本次未实施。S3 后端仍兼容，可显式设置 s3 并使用原 AWS 环境变量。
 Redis 控制身份需要限流用的 EVAL（其中调用 INCR/EXPIRE）及审计用的 XADD 权限。
+Vercel Marketplace 自动注入的 `KV_REST_API_URL` 与 `KV_REST_API_TOKEN` 也可直接使用。
+若显式配置了 `UPSTASH_REDIS_REST_URL`，则必须配套提供 `UPSTASH_REDIS_REST_TOKEN`；
+不会与另一组凭证混用。不要使用 `KV_REST_API_READ_ONLY_TOKEN`，限流和审计需要写权限。
 
 ### 私人访问认证
 

@@ -256,8 +256,11 @@ def app_from_env():
     else:
         auth=BearerAuth(json.loads(os.environ["AUCTION_AUTH_USERS_JSON"]))
     redis=None
+    # Vercel Marketplace uses KV_* names; keep each credential pair together.
     if os.environ.get("UPSTASH_REDIS_REST_URL"):
         redis=RedisControls(os.environ["UPSTASH_REDIS_REST_URL"],os.environ["UPSTASH_REDIS_REST_TOKEN"])
+    elif os.environ.get("KV_REST_API_URL"):
+        redis=RedisControls(os.environ["KV_REST_API_URL"],os.environ["KV_REST_API_TOKEN"])
     if cloud and redis is None:
         raise ValueError("CONFIG_INVALID: Vercel需要分布式限流与审计")
     origins=(public_url,) if public_url else ("http://127.0.0.1:8790","http://localhost:8790")
