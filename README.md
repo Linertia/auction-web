@@ -62,6 +62,11 @@ query entry is read-only; a leaked project secret still permits writes. Strict
 least privilege requires a separate Auth/JWT + Storage RLS design, not implemented.
 Legacy S3 remains available with backend=s3 and its original AWS variables/IAM.
 Redis needs the existing rate-limit EVAL (INCR/EXPIRE) and audit XADD permissions.
+Vercel Marketplace's paired `KV_REST_API_URL` / `KV_REST_API_TOKEN` variables
+are also supported. Explicit `UPSTASH_REDIS_REST_*` configuration takes priority;
+the two credential pairs are never mixed. Do not use the read-only Redis token.
+After updating production authentication or storage variables, redeploy before
+testing: existing deployments retain their original environment configuration.
 
 Create a PRIVATE auction-snapshots bucket (Public off), JSON MIME only, preferably
 16 MiB file limit. No browser/anon Storage policy is needed. Both reader and
