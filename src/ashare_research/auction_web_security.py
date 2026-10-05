@@ -21,6 +21,7 @@ from .auction_query import AuctionQueryError
 class Principal:
     subject: str
     servers: frozenset[str]
+    admin: bool = False
 
 
 principal_context: ContextVar[Principal | None] = ContextVar("auction_principal", default=None)

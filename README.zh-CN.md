@@ -167,3 +167,32 @@ Redis 审计保留是有界的，长期归档需另行配置，不能视为永�
 虚拟环境及测试生成物都不应提交。新增发布文件前应复查整个待提交 diff。
 
 参考：[Vercel FastAPI 官方说明](https://vercel.com/docs/frameworks/backend/fastapi)。
+
+## 邀请制账号登录
+
+生产服务端增加 `AUCTION_LOGIN_ENABLED=1`、`AUCTION_ADMIN_SUBJECTS=["owner"]`，
+可选 `AUCTION_ACCOUNT_LIMIT=100`。原有存储、认证与 Redis 环境变量保留。
+`owner` 指已有 Bearer 白名单的管理员名字，不是手机号；不将该凭证交给普通用户。
+
+第一次在网页“兼容访问凭证 / 管理员初始化”输入原管理员凭证，
+在“管理员 · 邀请与账号管理”创建自己的手机号账号并勾选管理员。
+密码留空生成8位随机英文数字，只有本次响应显示，请自行保存。
+随后用手机号和密码登录即可管理邀请，无公开注册或短信验证。
+管理员支持查看脱敏名单、停用、启用、重置密码与踢下线。
+
+登录有效7天；新设备登录原子替换旧会话，旧会话下一次请求401。
+不能收回旧网页已经显示的数据，不能证明物理设备唯一。
+使用 Secure / HttpOnly / SameSite=Strict 的主机专属 Cookie，必须 HTTPS。
+账号使用带随机盐的 scrypt 慢哈希；Redis 不存明文密码、原始 Cookie 或完整手机号。
+手机号哈希可枚举，不是彻底匿名化。8位是产品要求，弱于更长随机密码。
+每账号每分钟最多5次登录，全站每分钟30次；Redis或审计故障拒绝访问。
+账号键不设 TTL，Redis 不再只是可清理缓存：删除或驱逐账号键会丢失账号。
+本版没有账号备份/恢复功能。MCP仍使用原Bearer/OAuth，不接受网页Cookie。
+
+## 修改域名
+
+先在 Vercel 项目 Settings → Domains 添加你拥有的域名，按控制台提示配置 DNS。
+不要照抄其他项目的 IP/CNAME。等待域名与 HTTPS 验证成功后，将
+`AUCTION_PUBLIC_URL` 改为新域名的完整 HTTPS 地址并重新部署。
+此变量同时决定登录允许的 Origin 与 MCP 主机白名单；只改 DNS 会导致登录403。
+新域名需重新登录；原 Cookie 不跨域。已有远程 MCP 客户端也需改为新地址 `/mcp`。

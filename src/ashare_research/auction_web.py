@@ -21,7 +21,7 @@ from .auction_mcp import create_server
 from .auction_query import AuctionRankingReader, AuctionQueryError
 from .auction_snapshot_store import S3SnapshotStore, SupabaseSnapshotStore
 from .auction_web_security import (
-    AuditLog, BearerAuth, JWTAuth, MemoryRateLimit, RedisControls,
+    AuditLog, BearerAuth, JWTAuth, MemoryRateLimit, RedisControls, Principal,
     principal_context, audit_event,
 )
 from .contracts.paths import get_paths
@@ -31,6 +31,7 @@ PARAMETERS = {"trade_date", "server_id", "stage", "limit", "offset", "codes", "q
 STATUS = {"UNAUTHORIZED":401, "FORBIDDEN":403, "RATE_LIMITED":429, "QUERY_TIMEOUT":504,
           "QUERY_BUSY":503, "DATA_MISSING":404, "CODE_NOT_FOUND":404, "SNAPSHOT_BUSY":409,
           "AUDIT_UNAVAILABLE":503, "CONTROL_UNAVAILABLE":503, "SOURCE_UNAVAILABLE":503}
+STATUS.update({"ACCOUNT_EXISTS":409, "ACCOUNT_LIMIT":409, "ACCOUNT_MISSING":404})
 
 
 def error_response(code: str, request_id: str, status: int | None = None):
@@ -91,9 +92,10 @@ class WebQueryService:
 
 
 class AccessBoundary:
-    def __init__(self, app, auth, limiter, audit, origins, public_url=""):
+    def __init__(self, app, auth, limiter, audit, origins, public_url="", sessions=None):
         self.app, self.auth, self.limiter, self.audit = app, auth, limiter, audit
         self.origins, self.public_url = frozenset(origins), public_url.rstrip("/")
+        self.sessions = sessions
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
@@ -102,19 +104,42 @@ class AccessBoundary:
         if path == "/" or path.startswith("/.well-known/oauth-protected-resource"):
             return await self.app(scope, receive, send)
         rid = uuid.uuid4().hex
-        if path not in ("/api/auction/rank", "/api/auction/view", "/mcp", "/mcp/"):
+        login_paths = ("/api/auth/login", "/api/auth/logout", "/api/auth/me", "/api/auth/accounts")
+        if path not in ("/api/auction/rank", "/api/auction/view", "/mcp", "/mcp/") and not (
+                self.sessions and path in login_paths):
             return await error_response("NOT_FOUND",rid,404)(scope,receive,send)
         headers = dict(scope.get("headers",[]))
         principal = None
+        session_cookie = ""
         try:
             origin = headers.get(b"origin",b"").decode()
             if origin and origin not in self.origins:
                 raise AuctionQueryError("FORBIDDEN: Origin未授权")
             auth = headers.get(b"authorization",b"").decode()
-            if not auth.startswith("Bearer ") or len(auth) > 4096:
-                raise AuctionQueryError("UNAUTHORIZED: 需要Bearer身份验证")
-            principal = await asyncio.to_thread(self.auth.verify, auth[7:])
-            await asyncio.to_thread(self.limiter.check, principal.subject)
+            if path == "/api/auth/login":
+                if scope["method"] != "POST" or origin not in self.origins:
+                    raise AuctionQueryError("FORBIDDEN: 登录请求必须来自本站")
+                principal = Principal("anonymous-login", frozenset())
+            elif auth.startswith("Bearer ") and len(auth) <= 4096:
+                principal = await asyncio.to_thread(self.auth.verify, auth[7:])
+            elif self.sessions and path not in ("/mcp", "/mcp/") and not auth:
+                from http.cookies import SimpleCookie
+                from .auction_login import COOKIE
+                cookies = SimpleCookie()
+                raw_cookie = headers.get(b"cookie", b"").decode()
+                if len(raw_cookie) > 4096:
+                    raise AuctionQueryError("UNAUTHORIZED: Cookie无效")
+                cookies.load(raw_cookie)
+                session_cookie = cookies[COOKIE].value if COOKIE in cookies else ""
+                if scope["method"] not in ("GET", "HEAD") and origin not in self.origins:
+                    raise AuctionQueryError("FORBIDDEN: 会话请求必须来自本站")
+                principal = await asyncio.to_thread(self.sessions.verify, session_cookie)
+            else:
+                raise AuctionQueryError("UNAUTHORIZED: 需要身份验证")
+            if path != "/api/auth/login":
+                await asyncio.to_thread(self.limiter.check, principal.subject)
+            if path == "/api/auth/accounts" and not self.sessions.is_admin(principal):
+                raise AuctionQueryError("FORBIDDEN: 仅管理员可管理账号")
             # Bound actual body size, including chunked requests.
             body = bytearray()
             deadline = time.monotonic() + 5
@@ -166,11 +191,14 @@ class AccessBoundary:
                 message["headers"] = list(message.get("headers",[])) + [
                     (b"cache-control",b"no-store"), (b"x-request-id",rid.encode())]
                 try:
+                    # Also reject an in-flight query if another login revoked it.
+                    if session_cookie and path in ("/api/auction/rank", "/api/auction/view", "/api/auth/me"):
+                        await asyncio.to_thread(self.sessions.verify, session_cookie)
                     await asyncio.to_thread(self.audit.emit,audit_event(rid,"http_response",
                         principal.subject, http_status=message["status"]))
-                except AuctionQueryError:
+                except AuctionQueryError as exc:
                     audit_failed = True
-                    await error_response("AUDIT_UNAVAILABLE",rid)(scope,replay,send)
+                    await error_response(str(exc).split(":",1)[0],rid)(scope,replay,send)
                     return
             await send(message)
         try:
@@ -181,7 +209,7 @@ class AccessBoundary:
 
 
 def create_app(reader, auth, *, limiter=None, audit=None, timeout=8.0,
-               origins=("http://127.0.0.1:8790", "http://localhost:8790"), public_url="", issuer=""):
+               origins=("http://127.0.0.1:8790", "http://localhost:8790"), public_url="", issuer="", sessions=None):
     limiter, audit = limiter or MemoryRateLimit(), audit or AuditLog()
     service = WebQueryService(reader,audit,timeout)
     hosts = ["127.0.0.1:*", "localhost:*"]
@@ -200,7 +228,62 @@ def create_app(reader, auth, *, limiter=None, audit=None, timeout=8.0,
     app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.state.mcp, app.state.query_service = mcp, service
     app.add_middleware(AccessBoundary,auth=auth,limiter=limiter,audit=audit,
-                       origins=origins,public_url=public_url)
+                       origins=origins,public_url=public_url,sessions=sessions)
+
+    if sessions:
+        from .auction_login import COOKIE, TTL
+
+        async def auth_args(request, allowed, required):
+            try:
+                args = await request.json()
+                if not isinstance(args, dict) or set(args)-allowed or not required.issubset(args):
+                    raise ValueError()
+                return args
+            except (ValueError, TypeError):
+                raise AuctionQueryError("PARAMETERS_INVALID: 登录参数无效") from None
+
+        async def record(action):
+            principal = principal_context.get()
+            await asyncio.to_thread(audit.emit, audit_event(request_context.get(), action, principal.subject))
+
+        @app.post("/api/auth/login")
+        async def login(request: Request):
+            args = await auth_args(request, {"phone", "password"}, {"phone", "password"})
+            await record("login_attempt")
+            cookie = await asyncio.to_thread(sessions.login, args["phone"], args["password"])
+            response = JSONResponse({"ok":True, "expires_in":TTL})
+            response.set_cookie(COOKIE, cookie, max_age=TTL, secure=True, httponly=True, samesite="strict", path="/")
+            return response
+
+        @app.get("/api/auth/me")
+        async def me():
+            principal = principal_context.get()
+            return {"authenticated":True, "admin":sessions.is_admin(principal)}
+
+        @app.post("/api/auth/logout")
+        async def logout(request: Request):
+            await record("logout")
+            await asyncio.to_thread(sessions.logout, request.cookies.get(COOKIE, ""))
+            response = JSONResponse({"ok":True})
+            response.delete_cookie(COOKIE, secure=True, httponly=True, samesite="strict", path="/")
+            return response
+
+        @app.get("/api/auth/accounts")
+        async def accounts():
+            return {"accounts":await asyncio.to_thread(sessions.list_accounts)}
+
+        @app.post("/api/auth/accounts")
+        async def manage_accounts(request: Request):
+            args = await auth_args(request, {"action", "phone", "password", "admin", "account_id"}, {"action"})
+            if args["action"] == "create":
+                if "phone" not in args or "account_id" in args:
+                    raise AuctionQueryError("PARAMETERS_INVALID: 创建参数无效")
+                await record("account_create")
+                return await asyncio.to_thread(sessions.create, args["phone"], args.get("password"), args.get("admin",False))
+            if "account_id" not in args or "phone" in args or "admin" in args:
+                raise AuctionQueryError("PARAMETERS_INVALID: 管理参数无效")
+            await record("account_manage")
+            return await asyncio.to_thread(sessions.manage, args["account_id"], args["action"], args.get("password"))
 
     @app.exception_handler(AuctionQueryError)
     async def query_error(request, exc):
@@ -278,8 +361,14 @@ def app_from_env():
     if cloud and redis is None:
         raise ValueError("CONFIG_INVALID: Vercel需要分布式限流与审计")
     origins=(public_url,) if public_url else ("http://127.0.0.1:8790","http://localhost:8790")
+    sessions = None
+    if os.environ.get("AUCTION_LOGIN_ENABLED") == "1":
+        from .auction_login import InvitationSessions
+        sessions = InvitationSessions(redis, ids if backend != "local" else config["servers"],
+            json.loads(os.environ.get("AUCTION_ADMIN_SUBJECTS", "[]")),
+            int(os.environ.get("AUCTION_ACCOUNT_LIMIT", "100")))
     return create_app(reader,auth,limiter=redis or MemoryRateLimit(),audit=AuditLog(redis),
-                      origins=origins,public_url=public_url,issuer=issuer)
+                      origins=origins,public_url=public_url,issuer=issuer,sessions=sessions)
 
 
 def main():
