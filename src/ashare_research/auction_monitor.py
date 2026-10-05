@@ -1,10 +1,7 @@
-"""Read-only deployment subset; original data contract preserved verbatim."""
 from __future__ import annotations
-
 import math
 from dataclasses import dataclass, field
 from zoneinfo import ZoneInfo
-
 SHANGHAI = ZoneInfo("Asia/Shanghai")
 
 @dataclass

@@ -8,8 +8,9 @@ dependencies = [
     "uvicorn>=0.31,<1",
     "boto3>=1.35,<2",
     "tzdata>=2024.1",
-    "httpx>=0.28,<1",
-    "PyJWT[crypto]>=2.10,<3",
+    "supabase==2.32.0",
+    "httpx>=0.28,<0.29",
+    "PyJWT[crypto]>=2.12,<3",
 ]
 
 [tool.vercel]

@@ -1,6 +1,4 @@
-"""Read-only deployment subset; original ranking function preserved verbatim."""
 from __future__ import annotations
-
 from typing import Sequence
 from .auction_monitor import AuctionFeature
 

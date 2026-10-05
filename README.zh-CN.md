@@ -32,20 +32,20 @@ Redis，并先发布快照，才能完成线上查询验证。本机测试不能
 | 变量名 | 配置要求 |
 | --- | --- |
 | `AUCTION_PUBLIC_URL` | 实际固定 HTTPS 网站地址，不含末尾斜杠或 `/mcp` |
-| `AUCTION_SNAPSHOT_BACKEND` | `s3` |
+| `AUCTION_SNAPSHOT_BACKEND` | `supabase` |
 | `AUCTION_SERVER_IDS` | 授权服务器 ID 的 JSON 列表，例如 `["local"]` |
-| `AUCTION_S3_BUCKET` | 私有 S3 桶名称 |
-| `AUCTION_S3_PREFIX` | `auction` |
-| `AWS_REGION` | 桶所在区域 |
-| `AWS_ACCESS_KEY_ID` | 专用只读身份的访问标识 |
-| `AWS_SECRET_ACCESS_KEY` | 专用只读身份的密钥 |
-| `AWS_SESSION_TOKEN` | 使用临时 AWS 凭证时需要 |
+| `SUPABASE_URL` | 托管项目 HTTPS 地址，格式 https://项目引用.supabase.co |
+| `SUPABASE_SECRET_KEY` | 当前推荐的服务端 sb_secret_ 密钥，禁止发给浏览器 |
+| `SUPABASE_STORAGE_BUCKET` | `auction-snapshots`，必须私有 |
+| `SUPABASE_STORAGE_PREFIX` | `auction` |
 | `AUCTION_AUTH_USERS_JSON` | 私人模式的用户凭证哈希及服务器授权白名单 |
 | `UPSTASH_REDIS_REST_URL` | Redis REST 服务的 HTTPS 地址 |
 | `UPSTASH_REDIS_REST_TOKEN` | 限流、审计所用的 Redis 控制凭证 |
 
-Vercel 查询身份只允许读取指定发布前缀的 `s3:GetObject`，不要授予 `ListBucket`、
-`PutObject` 或 `DeleteObject`。本机上传器使用独立身份，不能把其写权限交给网站。
+Supabase 项目级 secret 会绕过 RLS，不是原 S3 的 GetObject-only IAM。
+Vercel 与本机发布器建议使用分别命名、可独立撤销的 secret，但不能声称严格读写隔离。
+网站应用只提供读取；密钥泄露仍可能写入。严格权限隔离需要另行配置 Auth/JWT+Storage RLS，
+本次未实施。S3 后端仍兼容，可显式设置 s3 并使用原 AWS 环境变量。
 Redis 控制身份需要限流用的 EVAL（其中调用 INCR/EXPIRE）及审计用的 XADD 权限。
 
 ### 私人访问认证
@@ -79,6 +79,21 @@ auction/<server_id>/<trade_date>/<stage>/latest.json
 `latest.json` 只包含 `{"sha256":"<内容哈希>"}`；不可变对象包含已有的去敏 metadata/CSV。
 上传器必须先上传并校验内容对象，再更新指针。`final` 和 `corrected` 分开存放，
 更正不能覆盖原始冻结。生产采集和独立发布工具不属于本仓库。
+
+在 Supabase Storage 新建私有 `auction-snapshots` bucket，Public关闭，
+允许 MIME 为 application/json，建议单对象上限16 MiB；不要授予浏览器或 anon 开放访问。
+查询先验证桶私有，再读指针和对象，SHA-256 不一致立即拒绝，禁止用最新行情补算。
+官方 SDK 固定 supabase==2.32.0，依赖闭包见 requirements-supabase.lock.txt。
+只支持托管项目和新式 sb_secret_ 服务端 key，不支持旧 service_role JWT或自托管地址。
+本机发布器只接受 date/stage/server-id/dry-run，复用已有去敏导出，不重新计算策略。
+上传内容（不覆盖）→回读校验长度/哈希→更新阶段指针→回读确认；内容失败不改指针。
+指针失联可能已被接受，需重试确认；同日期同stage发布需串行，非跨对象事务。
+
+免费额度和暂停政策以[官方定价](https://supabase.com/pricing)为准；本次查阅为1 GB Storage、
+5 GB egress与5 GB cached egress、50 MB平台文件上限、闲置一周可暂停。
+SDK 会完整缓冲下载后再检查大小，请勿向此桶写入非发布工具的大文件。
+本次仅完成代码与离线测试，未完成真实 Supabase/Vercel 联调。
+密钥权限说明见[官方 API key 文档](https://supabase.com/docs/guides/api/api-keys)。
 
 没有快照时查询应返回明确错误，不得用盘中或收盘累计行情补算 09:25 数据。
 快照中的历史误判不会被访问层自动修正。本网站当前查询阶段快照，不是完整实时采集监视器。

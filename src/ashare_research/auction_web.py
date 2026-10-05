@@ -19,7 +19,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 
 from .auction_mcp import create_server
 from .auction_query import AuctionRankingReader, AuctionQueryError
-from .auction_snapshot_store import S3SnapshotStore
+from .auction_snapshot_store import S3SnapshotStore, SupabaseSnapshotStore
 from .auction_web_security import (
     AuditLog, BearerAuth, JWTAuth, MemoryRateLimit, RedisControls,
     principal_context, audit_event,
@@ -237,6 +237,9 @@ def app_from_env():
         ids = json.loads(os.environ["AUCTION_SERVER_IDS"])
         reader = AuctionRankingReader({key:Path(".") for key in ids}, store=S3SnapshotStore(
             os.environ["AUCTION_S3_BUCKET"],os.environ.get("AUCTION_S3_PREFIX","auction")))
+    elif backend == "supabase":
+        ids = json.loads(os.environ["AUCTION_SERVER_IDS"])
+        reader = AuctionRankingReader({key:Path(".") for key in ids}, store=SupabaseSnapshotStore())
     elif backend == "local" and not cloud:
         root = get_paths().root
         config=json.loads((root / "configs/auction-mcp.json").read_text(encoding="utf-8"))

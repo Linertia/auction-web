@@ -5,8 +5,12 @@ import hashlib
 import json
 import re
 import os
+import csv
+import io
 from pathlib import Path
 from typing import Protocol
+from datetime import datetime
+from urllib.parse import urlsplit
 
 MAX_BYTES = 8 * 1024 * 1024
 STEMS = {"final": "fixed-0925-v2", "corrected": "fixed-0925-v2-corrected",
@@ -129,3 +133,121 @@ class S3SnapshotStore:
             raise
         except (ValueError, KeyError, TypeError, AttributeError):
             raise AuctionQueryError("DATA_INVALID: 云端发布清单或对象损坏") from None
+
+
+def supabase_settings() -> tuple[str, str, str, str]:
+    """Operator environment only; never accepted in REST/MCP parameters."""
+    url = os.environ.get("SUPABASE_URL", "").rstrip("/")
+    secret = os.environ.get("SUPABASE_SECRET_KEY", "")
+    bucket = os.environ.get("SUPABASE_STORAGE_BUCKET", "auction-snapshots")
+    prefix = os.environ.get("SUPABASE_STORAGE_PREFIX", "auction")
+    try:
+        parsed = urlsplit(url)
+        valid = (parsed.scheme == "https" and parsed.hostname
+                 and re.fullmatch(r"[a-z0-9-]+\.supabase\.co", parsed.hostname)
+                 and parsed.port in (None, 443) and not parsed.username and not parsed.password
+                 and not parsed.path and not parsed.query and not parsed.fragment)
+    except ValueError:
+        valid = False
+    if (not valid or not re.fullmatch(r"sb_secret_[A-Za-z0-9_-]{16,}", secret)
+        or not re.fullmatch(r"[a-z0-9][a-z0-9_-]{1,62}", bucket)
+        or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", prefix)):
+        raise AuctionQueryError("CONFIG_INVALID: 需要有效的Supabase服务端环境配置")
+    return url, secret, bucket, prefix
+
+
+def supabase_storage_client(url: str, secret: str):
+    """Official pinned SDK; no credential files, Auth refresh or session persistence."""
+    try:
+        import httpx
+        from supabase import ClientOptions, create_client
+        # Redirects cannot forward the secret to a different origin; environment
+        # proxy variables are not used. SDK exceptions must never escape callers.
+        session = httpx.Client(timeout=httpx.Timeout(3.0, connect=2.0),
+                               follow_redirects=False, trust_env=False)
+        return create_client(url, secret, options=ClientOptions(
+            auto_refresh_token=False, persist_session=False,
+            storage_client_timeout=3, httpx_client=session)).storage
+    except Exception:
+        raise AuctionQueryError("SOURCE_UNAVAILABLE: 无法初始化Supabase存储") from None
+
+
+def require_private_supabase_bucket(storage, bucket: str) -> None:
+    """Check metadata without changing bucket permissions or creating a bucket."""
+    try:
+        metadata = storage.get_bucket(bucket)
+        public = metadata.get("public") if isinstance(metadata, dict) else metadata.public
+        if public is not False:
+            raise AuctionQueryError("BUCKET_NOT_PRIVATE: 拒绝使用非私有Storage桶")
+    except AuctionQueryError:
+        raise
+    except Exception:
+        raise AuctionQueryError("SOURCE_UNAVAILABLE: 私有Storage桶不可访问") from None
+
+
+class SupabaseSnapshotStore:
+    """Downloads only published pointers/bundles. Project secret is NOT read-only IAM."""
+    def __init__(self, *, client=None):
+        url, secret, self.bucket, self.prefix = supabase_settings()
+        self._storage = client if client is not None else supabase_storage_client(url, secret)
+
+    def _get(self, key: str, maximum: int) -> bytes:
+        try:
+            content = self._storage.from_(self.bucket).download(key)
+            if not isinstance(content, bytes):
+                raise AuctionQueryError("DATA_INVALID: Storage对象不是字节数据")
+            if len(content) > maximum:
+                raise AuctionQueryError("SOURCE_TOO_LARGE: Storage对象超过大小限制")
+            return content
+        except AuctionQueryError:
+            raise
+        except Exception as exc:
+            # Inspect structured status/code only; never echo exception messages.
+            if str(getattr(exc, "status", "")) == "404" or getattr(exc, "code", "") in (
+                "NoSuchKey", "NoSuchObject", "not_found"):
+                raise AuctionQueryError("DATA_MISSING: 该日期或阶段没有完整发布的快照") from None
+            raise AuctionQueryError("SOURCE_UNAVAILABLE: Supabase存储不可用") from None
+
+    def read(self, server_id: str, trade_date: str, stage: str) -> tuple[bytes, bytes]:
+        if (not isinstance(server_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,32}", server_id)
+            or not isinstance(trade_date, str) or not re.fullmatch(r"[0-9]{8}", trade_date)
+            or not isinstance(stage, str) or stage not in STEMS):
+            raise AuctionQueryError("PARAMETERS_INVALID: Storage查询标识无效")
+        try:
+            datetime.strptime(trade_date, "%Y%m%d")
+        except ValueError:
+            raise AuctionQueryError("DATE_INVALID: 日期不存在") from None
+        require_private_supabase_bucket(self._storage, self.bucket)
+        try:
+            manifest = json.loads(self._get(
+                f"{self.prefix}/{server_id}/{trade_date}/{stage}/latest.json", 65536))
+            if (not isinstance(manifest, dict) or set(manifest) != {"sha256"}
+                or not isinstance(manifest["sha256"], str)
+                or not re.fullmatch(r"[0-9a-f]{64}", manifest["sha256"])):
+                raise ValueError()
+            digest = manifest["sha256"]
+            blob = self._get(f"{self.prefix}/objects/{digest}.json", 2 * MAX_BYTES)
+            if hashlib.sha256(blob).hexdigest() != digest:
+                raise AuctionQueryError("SOURCE_HASH_MISMATCH: Storage对象SHA256不一致")
+            bundle = json.loads(blob)
+            if not isinstance(bundle, dict) or set(bundle) != {"metadata_utf8", "rows_csv_utf8"}:
+                raise ValueError()
+            if any(not isinstance(value, str) for value in bundle.values()):
+                raise ValueError()
+            raw_meta, raw_rows = bundle["metadata_utf8"].encode(), bundle["rows_csv_utf8"].encode()
+            if len(raw_meta) > MAX_BYTES or len(raw_rows) > MAX_BYTES:
+                raise AuctionQueryError("SOURCE_TOO_LARGE: 快照超过大小限制")
+            # Refuse unsanitized metadata/CSV even if their content hash is valid.
+            from .auction_query import PUBLIC_NUMBERS
+            metadata = json.loads(raw_meta)
+            if not isinstance(metadata, dict) or set(metadata) != {"cycle_id", "observed_at", "data_healthy"}:
+                raise ValueError()
+            columns = csv.DictReader(io.StringIO(raw_rows.decode("utf-8-sig"))).fieldnames
+            expected = {"cycle_id", "observed_at", "code", "rank", "qualified", *PUBLIC_NUMBERS}
+            if columns is None or set(columns) != expected or len(columns) != len(expected):
+                raise ValueError()
+            return raw_meta, raw_rows
+        except AuctionQueryError:
+            raise
+        except (ValueError, KeyError, TypeError, AttributeError, csv.Error):
+            raise AuctionQueryError("DATA_INVALID: 发布指针或去敏对象格式无效") from None

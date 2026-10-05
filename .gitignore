@@ -8,6 +8,7 @@
 !index.py
 !pyproject.toml
 !requirements.txt
+!requirements-supabase.lock.txt
 !vercel.json
 !src/
 !src/**/

@@ -25,14 +25,12 @@ Do not use public/client-side variable prefixes. Do not add values to this repo.
 | Variable | Value / purpose |
 | --- | --- |
 | `AUCTION_PUBLIC_URL` | Fixed HTTPS website origin, no trailing slash or `/mcp` |
-| `AUCTION_SNAPSHOT_BACKEND` | `s3` |
+| `AUCTION_SNAPSHOT_BACKEND` | `supabase` |
 | `AUCTION_SERVER_IDS` | Authorized server IDs as JSON, e.g. `["local"]` |
-| `AUCTION_S3_BUCKET` | Private bucket name |
-| `AUCTION_S3_PREFIX` | `auction` |
-| `AWS_REGION` | Bucket region |
-| `AWS_ACCESS_KEY_ID` | Dedicated read-only identity, GetObject only |
-| `AWS_SECRET_ACCESS_KEY` | Dedicated read-only identity secret |
-| `AWS_SESSION_TOKEN` | Required only for temporary AWS credentials |
+| `SUPABASE_URL` | Hosted HTTPS project origin: https://project-ref.supabase.co |
+| `SUPABASE_SECRET_KEY` | Modern server-only sb_secret_ key; never browser-visible |
+| `SUPABASE_STORAGE_BUCKET` | `auction-snapshots`, private only |
+| `SUPABASE_STORAGE_PREFIX` | `auction` |
 | `AUCTION_AUTH_USERS_JSON` | Per-user SHA-256 Bearer hashes and authorized server IDs |
 | `UPSTASH_REDIS_REST_URL` | HTTPS Redis REST endpoint |
 | `UPSTASH_REDIS_REST_TOKEN` | Redis control identity for rate limiting and audit |
@@ -49,7 +47,7 @@ For external OAuth instead of the private Bearer whitelist, additionally set
 The external identity provider must issue RS256 tokens with scope `auction:read`
 and audience `<AUCTION_PUBLIC_URL>/mcp`. This repository is not an OAuth issuer.
 
-Read-only S3 objects must already be published:
+Sanitized Supabase Storage objects must already be published:
 
 ```
 auction/objects/<SHA256>.json
@@ -58,9 +56,28 @@ auction/<server_id>/<trade_date>/<stage>/latest.json
 
 The pointer contains only `{"sha256":"<content hash>"}`. The object is the
 existing sanitized metadata/CSV bundle. Final and corrected stages are separate.
-Do not grant the website ListBucket, PutObject or DeleteObject permissions.
-The separate local publisher must not share its write credentials with Vercel.
+Project secret keys bypass RLS: separate named query/publisher keys permit
+independent revocation but NOT read/write permission isolation. The application
+query entry is read-only; a leaked project secret still permits writes. Strict
+least privilege requires a separate Auth/JWT + Storage RLS design, not implemented.
+Legacy S3 remains available with backend=s3 and its original AWS variables/IAM.
 Redis needs the existing rate-limit EVAL (INCR/EXPIRE) and audit XADD permissions.
+
+Create a PRIVATE auction-snapshots bucket (Public off), JSON MIME only, preferably
+16 MiB file limit. No browser/anon Storage policy is needed. Both reader and
+publisher verify bucket privacy. Downloads validate the SHA-256 before parsing.
+The local publisher consumes existing sanitized exports, never computes strategy:
+upload immutable content without upsert, download/verify length and hash, then
+upload stage pointer and confirm by download. Failed content cannot update pointer.
+Serialize publication per date/stage; pointer timeouts may require confirmation.
+
+Official Python SDK is pinned to supabase==2.32.0; its dependency closure is
+requirements-supabase.lock.txt. Hosted project URLs and modern secret keys only.
+SDK downloads buffer the object before size checks; do not populate this bucket
+with arbitrary large files. See [API keys](https://supabase.com/docs/guides/api/api-keys)
+and [current free limits](https://supabase.com/pricing): when checked, 1 GB Storage,
+5 GB egress plus 5 GB cached egress, 50 MB platform file limit and possible
+inactivity pause after one week. No live Supabase/Vercel verification performed yet.
 
 ## First deployment verification
 
@@ -71,7 +88,7 @@ Redis needs the existing rate-limit EVAL (INCR/EXPIRE) and audit XADD permission
 3. POST `/api/auction/rank` without authentication: expect 401. With a separately
    supplied authorized Bearer header and JSON body
    `{"trade_date":"20260930","server_id":"local","stage":"final","limit":3}`,
-   expect 200 only after that exact snapshot has been published to S3. Compare
+   expect 200 only after that exact snapshot has been published to Storage. Compare
    codes, ranks, scores and qualification with the original local query result.
 4. Use an MCP client at `/mcp`: initialize, tools/list, tools/call. The only tool
    must be `rank_auction_candidates`; its result must match the REST response
@@ -96,4 +113,4 @@ The source research repository and its local stdio entrypoint are unchanged.
 
 The FastAPI layout matches https://vercel.com/docs/frameworks/backend/fastapi .
 Local import/protocol checks do not prove a cloud deployment is operational:
-cloud build, S3/Redis permissions and cross-device access require live testing.
+cloud build, Supabase/Redis access and cross-device access require live testing.
