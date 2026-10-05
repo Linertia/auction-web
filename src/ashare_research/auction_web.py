@@ -131,9 +131,9 @@ class AccessBoundary:
                     raise AuctionQueryError("UNAUTHORIZED: Cookie无效")
                 cookies.load(raw_cookie)
                 session_cookie = cookies[COOKIE].value if COOKIE in cookies else ""
+                principal = await asyncio.to_thread(self.sessions.verify, session_cookie)
                 if scope["method"] not in ("GET", "HEAD") and origin not in self.origins:
                     raise AuctionQueryError("FORBIDDEN: 会话请求必须来自本站")
-                principal = await asyncio.to_thread(self.sessions.verify, session_cookie)
             else:
                 raise AuctionQueryError("UNAUTHORIZED: 需要身份验证")
             if path != "/api/auth/login":
