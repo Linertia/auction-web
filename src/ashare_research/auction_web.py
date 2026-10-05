@@ -282,6 +282,8 @@ def create_app(reader, auth, *, limiter=None, audit=None, timeout=8.0,
                 return await asyncio.to_thread(sessions.create, args["phone"], args.get("password"), args.get("admin",False))
             if "account_id" not in args or "phone" in args or "admin" in args:
                 raise AuctionQueryError("PARAMETERS_INVALID: 管理参数无效")
+            if args["action"] == "promote" and principal_context.get().subject not in sessions.admin_subjects:
+                raise AuctionQueryError("FORBIDDEN: 只有预设所有者可恢复管理员权限")
             await record("account_manage")
             return await asyncio.to_thread(sessions.manage, args["account_id"], args["action"], args.get("password"))
 

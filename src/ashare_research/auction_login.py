@@ -79,6 +79,7 @@ else
  if ARGV[1]=='disable' then row.active=false end
  if ARGV[1]=='enable' then row.active=true end
  if ARGV[1]=='reset' then row.password=ARGV[2] end
+ if ARGV[1]=='promote' then row.admin=true end
 end
 row.session=''; row.expires=0
 redis.call('SET',KEYS[1],cjson.encode(row)); return 1
@@ -175,7 +176,7 @@ class InvitationSessions:
     def manage(self, aid, action, password=None):
         if not isinstance(aid, str) or not re.fullmatch(r"[0-9a-f]{64}", aid):
             raise AuctionQueryError("PARAMETERS_INVALID: 账号编号无效")
-        if action not in ("disable", "enable", "reset", "revoke"):
+        if action not in ("disable", "enable", "reset", "revoke", "promote"):
             raise AuctionQueryError("PARAMETERS_INVALID: 账号操作无效")
         if action != "reset" and password is not None:
             raise AuctionQueryError("PARAMETERS_INVALID: 此操作不接收密码")

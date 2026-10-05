@@ -121,21 +121,20 @@ Local import/protocol checks do not prove a cloud deployment is operational:
 cloud build, Supabase/Redis access and cross-device access require live testing.
 # Invitation-only website sessions
 
-Set server-only production variables `AUCTION_LOGIN_ENABLED=1` and
-`AUCTION_ADMIN_SUBJECTS=["owner"]`; optionally set `AUCTION_ACCOUNT_LIMIT=100`.
-Retain existing storage, Redis and MCP credentials. Bootstrap the first phone
-administrator through the website's compatibility credential panel using the
-existing explicitly allowlisted owner Bearer. Never give that Bearer to invitees.
+The website exposes the same phone-login and query interface to everyone;
+no administrator setup, account management, role label or compatibility Bearer field.
+Administrator provisioning uses a separate local masked-input utility, excluded
+from this repository. Existing accounts require explicit consent to reset the
+password, enable, restore admin rights and revoke old sessions. Backend management
+still enforces administrator authorization; promotion additionally requires the
+explicitly configured owner Bearer. MCP remains Bearer/OAuth-only.
 
-Passwords are eight random alphanumeric characters, delivered once, stored only
-as salted scrypt hashes. Secure HttpOnly SameSite=Strict cookies last seven days.
-New login atomically revokes the previous session; already displayed data cannot
-be recalled, and this is not physical-device attestation. No public signup/SMS.
-Admins can invite, disable, enable, reset passwords and revoke sessions.
-Redis is authoritative account storage, not disposable cache: deleting or evicting
-account keys loses accounts; automatic backups are not implemented. MCP remains
-Bearer/OAuth-only and its schemas and auction ranking are unchanged.
+Set server-only `AUCTION_LOGIN_ENABLED=1`, `AUCTION_ADMIN_SUBJECTS=["owner"]` and
+optionally `AUCTION_ACCOUNT_LIMIT=100`. Passwords are salted scrypt hashes;
+Secure HttpOnly SameSite=Strict cookies expire after seven days. New login revokes
+the previous session; already displayed data cannot be recalled. This is not
+physical-device attestation. Redis is authoritative account storage, not disposable
+cache. Deleting/evicting account keys loses accounts; backups are not implemented.
 
-For custom domains, add the domain through Vercel Settings → Domains, apply the
-project-specific DNS instructions, then change `AUCTION_PUBLIC_URL` to the new
-HTTPS origin and redeploy. Re-login and update remote MCP clients to its `/mcp` URL.
+When changing domains, update `AUCTION_PUBLIC_URL` to the new HTTPS origin and
+redeploy. Re-login and update MCP clients to the new `/mcp` endpoint.
