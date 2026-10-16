@@ -14,7 +14,8 @@ from urllib.parse import urlsplit
 
 MAX_BYTES = 8 * 1024 * 1024
 STEMS = {"final": "fixed-0925-v2", "corrected": "fixed-0925-v2-corrected",
-         "0915": "gate-0915", "0920": "gate-0920", "0924": "gate-0924"}
+         "history": "fixed-0925-v2-history", "0915": "gate-0915",
+         "0920": "gate-0920", "0924": "gate-0924"}
 
 
 class AuctionQueryError(ValueError):
@@ -238,14 +239,16 @@ class SupabaseSnapshotStore:
             if len(raw_meta) > MAX_BYTES or len(raw_rows) > MAX_BYTES:
                 raise AuctionQueryError("SOURCE_TOO_LARGE: 快照超过大小限制")
             # Refuse unsanitized metadata/CSV even if their content hash is valid.
-            from .auction_query import PUBLIC_NUMBERS
+            from .auction_query import PUBLIC_NUMBERS, validate_provenance
             metadata = json.loads(raw_meta)
             required = {"cycle_id", "observed_at", "data_healthy"}
-            if not isinstance(metadata, dict) or not required <= set(metadata) or set(metadata) - required - {"display"}:
+            if (not isinstance(metadata, dict) or not required <= set(metadata)
+                or set(metadata) - required - {"display", "provenance"}):
                 raise ValueError()
             if "display" in metadata:
                 from .auction_display import validate_display
                 validate_display(metadata["display"])
+            validate_provenance(metadata.get("provenance"))
             columns = csv.DictReader(io.StringIO(raw_rows.decode("utf-8-sig"))).fieldnames
             expected = {"cycle_id", "observed_at", "code", "rank", "qualified", *PUBLIC_NUMBERS}
             if columns is None or set(columns) != expected or len(columns) != len(expected):

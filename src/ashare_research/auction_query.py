@@ -20,12 +20,48 @@ from .auction_snapshot_store import (
     AuctionQueryError, SnapshotStore, LocalSnapshotStore, STEMS, MAX_BYTES, _read,
 )
 
-Stage = Literal["final", "corrected", "0915", "0920", "0924"]
+Stage = Literal["final", "corrected", "history", "0915", "0920", "0924"]
 MAX_ROWS = 10000
 PUBLIC_NUMBERS = ("score", "gap_pct", "matched_price", "matched_volume_lots",
                   "matched_amount_yuan", "turnover_pct", "unmatched_buy_amount_yuan",
                   "unmatched_sell_amount_yuan", "unmatched_buy_turnover_pct",
                   "unmatched_sell_turnover_pct")
+
+
+def validate_provenance(value: object) -> dict | None:
+    """Validate the small public provenance contract used by historical freezes."""
+    if value is None:
+        return None
+    expected = {
+        "kind", "sampling_scope", "market_source", "backfill_status",
+        "free_share_source_date", "free_share_exact_date", "event_risk_complete",
+        "source_row_count", "published_row_count", "excluded_row_count",
+    }
+    if not isinstance(value, dict) or set(value) != expected:
+        raise AuctionQueryError("DATA_INVALID: 快照来源标记无效")
+    if value["kind"] != "historical_gate_backfill_v2":
+        raise AuctionQueryError("DATA_INVALID: 快照来源类型无效")
+    if value["sampling_scope"] != "gate_conditioned_not_full_market":
+        raise AuctionQueryError("DATA_INVALID: 快照样本范围无效")
+    if value["market_source"] != "amazingdata_first_match_publish":
+        raise AuctionQueryError("DATA_INVALID: 快照行情来源无效")
+    if value["backfill_status"] not in {"complete", "partial"}:
+        raise AuctionQueryError("DATA_INVALID: 历史补测状态无效")
+    source_date = value["free_share_source_date"]
+    if not isinstance(source_date, str) or not re.fullmatch(r"[0-9]{8}", source_date):
+        raise AuctionQueryError("DATA_INVALID: 流通股本来源日期无效")
+    try:
+        datetime.strptime(source_date, "%Y%m%d")
+    except ValueError:
+        raise AuctionQueryError("DATA_INVALID: 流通股本来源日期无效") from None
+    if type(value["free_share_exact_date"]) is not bool or type(value["event_risk_complete"]) is not bool:
+        raise AuctionQueryError("DATA_INVALID: 历史补测质量标记无效")
+    counts = [value[key] for key in ("source_row_count", "published_row_count", "excluded_row_count")]
+    if (any(type(item) is not int or item < 0 for item in counts)
+        or value["published_row_count"] <= 0
+        or value["source_row_count"] != value["published_row_count"] + value["excluded_row_count"]):
+        raise AuctionQueryError("DATA_INVALID: 历史补测行数标记无效")
+    return dict(value)
 
 
 class AuctionRankingReader:
@@ -59,7 +95,7 @@ class AuctionRankingReader:
         if server_id not in self.servers:
             raise AuctionQueryError("SERVER_NOT_ALLOWED: 服务器未预先授权")
         if stage not in STEMS:
-            raise AuctionQueryError("STAGE_INVALID: 使用final/corrected/0915/0920/0924")
+            raise AuctionQueryError("STAGE_INVALID: 使用final/corrected/history/0915/0920/0924")
         if type(limit) is not int or not 1 <= limit <= 100:
             raise AuctionQueryError("LIMIT_INVALID: limit必须是1至100的整数")
         if type(offset) is not int or not 0 <= offset <= MAX_ROWS:
@@ -135,10 +171,15 @@ class AuctionRankingReader:
             ranked = rank_auction_features(features)
             if any(row.rank != index for index, row in enumerate(ranked, 1)):
                 raise AuctionQueryError("RANK_MISMATCH: 保存排名与现有排序入口不一致")
+            provenance = validate_provenance(meta.get("provenance"))
             digest = hashlib.sha256(raw_meta + raw_rows).hexdigest()
             return ({"observed_at": observed.isoformat(), "data_healthy": meta["data_healthy"],
                      "source_sha256": digest, "cached_seconds_max": 1,
-                     "interpretation": "published_monitor_result"},
+                     "interpretation": ("historical_gate_conditioned_result" if provenance
+                                        else "published_monitor_result"),
+                     "sampling_scope": (provenance["sampling_scope"] if provenance
+                                        else "published_monitor_scope"),
+                     **({"provenance": provenance} if provenance else {})},
                     [public[row.code] for row in ranked])
         except AuctionQueryError:
             raise
