@@ -39,9 +39,11 @@ def validate_provenance(value: object) -> dict | None:
     }
     if not isinstance(value, dict) or set(value) != expected:
         raise AuctionQueryError("DATA_INVALID: 快照来源标记无效")
-    if value["kind"] != "historical_gate_backfill_v2":
+    scopes = {"historical_gate_backfill_v2": "gate_conditioned_not_full_market",
+              "historical_archive_final_v2": "main_board_archive_with_missing_accounted"}
+    if value["kind"] not in scopes:
         raise AuctionQueryError("DATA_INVALID: 快照来源类型无效")
-    if value["sampling_scope"] != "gate_conditioned_not_full_market":
+    if value["sampling_scope"] != scopes[value["kind"]]:
         raise AuctionQueryError("DATA_INVALID: 快照样本范围无效")
     if value["market_source"] != "amazingdata_first_match_publish":
         raise AuctionQueryError("DATA_INVALID: 快照行情来源无效")
@@ -175,8 +177,8 @@ class AuctionRankingReader:
             digest = hashlib.sha256(raw_meta + raw_rows).hexdigest()
             return ({"observed_at": observed.isoformat(), "data_healthy": meta["data_healthy"],
                      "source_sha256": digest, "cached_seconds_max": 1,
-                     "interpretation": ("historical_gate_conditioned_result" if provenance
-                                        else "published_monitor_result"),
+                     "interpretation": (("historical_archive_final_result" if provenance['kind'] == 'historical_archive_final_v2'
+                                         else "historical_gate_conditioned_result") if provenance else "published_monitor_result"),
                      "sampling_scope": (provenance["sampling_scope"] if provenance
                                         else "published_monitor_scope"),
                      **({"provenance": provenance} if provenance else {})},

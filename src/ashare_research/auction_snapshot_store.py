@@ -50,15 +50,16 @@ class LocalSnapshotStore:
         if not folder.resolve().is_relative_to(root):
             raise AuctionQueryError("SOURCE_OUTSIDE_ALLOWLIST: 日期目录不在授权范围")
         try:
-            candidates = list(folder.glob(f"run-v2-*/{stem}.json"))
-            if len(candidates) > 128:
-                raise AuctionQueryError("TOO_MANY_RUNS: 当日运行目录超过128个")
-            if not candidates:
+            from .auction_integrity import select_snapshot_path, validate_final
+            path = select_snapshot_path(root, trade_date, stem)
+            if path is None:
                 raise AuctionQueryError("DATA_MISSING: 该日期/阶段没有已发布快照")
-            if any(not path.resolve().is_relative_to(root) for path in candidates):
+            if not path.resolve().is_relative_to(root):
                 raise AuctionQueryError("SOURCE_OUTSIDE_ALLOWLIST: 快照越过授权边界")
-            path = (max(candidates) if stage == "final" else
-                    max(candidates, key=lambda item: item.stat().st_mtime_ns))
+            if stage == 'final':
+                check = validate_final(path, day=trade_date)
+                if not check['success']:
+                    raise AuctionQueryError('FINAL_NOT_ACCEPTABLE: ' + ','.join(check['errors']))
             all_path = path.with_name(stem + "-all.csv")
             before = (path.stat().st_mtime_ns, all_path.stat().st_mtime_ns)
             raw_meta, raw_rows = _read(path, root), _read(all_path, root)
@@ -157,18 +158,21 @@ def supabase_settings() -> tuple[str, str, str, str]:
     return url, secret, bucket, prefix
 
 
-def supabase_storage_client(url: str, secret: str):
+def supabase_storage_client(url: str, secret: str, *, publication: bool = False):
     """Official pinned SDK; no credential files, Auth refresh or session persistence."""
     try:
         import httpx
         from supabase import ClientOptions, create_client
         # Redirects cannot forward the secret to a different origin; environment
         # proxy variables are not used. SDK exceptions must never escape callers.
-        session = httpx.Client(timeout=httpx.Timeout(3.0, connect=2.0),
+        # Local publication may transfer ~1MiB bundles over a slow uplink.
+        # Readers retain their original strict timeout; no Web/MCP option exposes this.
+        timeout, connect = (30.0, 5.0) if publication else (3.0, 2.0)
+        session = httpx.Client(timeout=httpx.Timeout(timeout, connect=connect),
                                follow_redirects=False, trust_env=False)
         return create_client(url, secret, options=ClientOptions(
             auto_refresh_token=False, persist_session=False,
-            storage_client_timeout=3, httpx_client=session)).storage
+            storage_client_timeout=timeout, httpx_client=session)).storage
     except Exception:
         raise AuctionQueryError("SOURCE_UNAVAILABLE: 无法初始化Supabase存储") from None
 
