@@ -16,7 +16,7 @@ MAX_BYTES = 8 * 1024 * 1024
 STEMS = {"final": "fixed-0925-v2", "corrected": "fixed-0925-v2-corrected",
          "history": "fixed-0925-v2-history", "0915": "gate-0915",
          "0920": "gate-0920", "0924": "gate-0924"}
-WEB_STAGES = ("final", "0920", "0915")
+WEB_STAGES = ("final", "history", "0920", "0915")
 
 
 class AuctionQueryError(ValueError):
@@ -28,7 +28,8 @@ class SnapshotStore(Protocol):
 
 
 def pointer_entries(keys, prefix):
-    pattern = re.compile(re.escape(prefix) + r"([0-9]{8})/(final|0920|0915)/latest\.json")
+    stages = "|".join(WEB_STAGES)
+    pattern = re.compile(re.escape(prefix) + rf"([0-9]{{8}})/({stages})/latest\.json")
     for key in keys:
         if match := pattern.fullmatch(key):
             yield match[1], match[2]

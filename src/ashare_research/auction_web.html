@@ -78,8 +78,13 @@ dialog[open]{position:fixed;inset:0;margin:auto}
 'use strict';
 const $=id=>document.getElementById(id);
 const stages=[...document.querySelectorAll('[data-stage]')], views=[...document.querySelectorAll('[data-view]')];
-const stageOrder=['final','0920','0915'], pageSize=100, viewCache=new Map();
-const labels={final:'09:25 冻结',corrected:'09:25 修正'};
+const stageOrder=['final','history','0920','0915'], pageSize=100, viewCache=new Map();
+const labels={final:'09:25 冻结',history:'09:25 历史重建',corrected:'09:25 修正'};
+const historicalSources={
+ historical_gate_backfill_v2:'仅覆盖通过早期门槛的候选池。',
+ historical_archive_final_v2:'来自主板竞价归档，覆盖存在缺口。',
+ historical_capture_final_v2:'来自本机记录的主板实时推送，覆盖范围限于已捕获个股。'
+};
 const columns=[['rank','名次'],['code','代码'],['name','名称'],['score','竞价指数'],['gap_pct','竞价涨幅'],['matched_amount_yuan','匹配额'],['turnover_pct','竞价换手'],['qualified','资格'],['matched_price','撮合价'],['unmatched_buy_amount_yuan','未匹配买'],['unmatched_sell_amount_yuan','未匹配卖']];
 const extraFields=new Set(columns.slice(8).map(([key])=>key));
 const sortable=new Set(['score','gap_pct','matched_amount_yuan','turnover_pct']);
@@ -161,12 +166,19 @@ function begin(){
  return {id:sequence,session:epoch,signal:active.signal};
 }
 function current(task){return session&&task.id===sequence&&task.session===epoch}
+function availableStages(){
+ return catalog?.stages_by_date?.[$('date').value]??(catalog?[]:['final','0920','0915']);
+}
 function setStage(preferred){
- const available=catalog?.stages_by_date?.[$('date').value]??(catalog?[]:stageOrder);
+ const available=availableStages();
+ const endStage=available.includes('final')?'final':available.includes('history')?'history':null;
+ if(preferred==='final'||preferred==='history')preferred=endStage;
  selectedStage=available.includes(preferred)?preferred:stageOrder.find(stage=>available.includes(stage))??null;
  for(const button of stages){
-  button.disabled=!available.includes(button.dataset.stage);
-  button.setAttribute('aria-pressed',String(button.dataset.stage===selectedStage));
+  const stage=button.dataset.stage==='final'?endStage:button.dataset.stage;
+  if(button.dataset.stage==='final')button.textContent=labels[endStage]??labels.final;
+  button.disabled=!available.includes(stage);
+  button.setAttribute('aria-pressed',String(stage!==null&&stage===selectedStage));
  }
 }
 async function loadCatalog(server,keepDate=false){
@@ -193,7 +205,10 @@ async function loadCatalog(server,keepDate=false){
  $('server').replaceChildren(...data.server_ids.map(id=>option(id,id)));
  $('server').value=data.server_id??data.default_server_id;
  $('server').hidden=data.server_ids.length<2;
- $('date').replaceChildren(...data.recent_dates.map(day=>option(day,pretty(day))));
+ $('date').replaceChildren(...data.recent_dates.map(day=>{
+  const frames=data.stages_by_date?.[day]??[];
+  return option(day,pretty(day)+(!frames.includes('final')&&frames.includes('history')?' · 历史重建':''));
+ }));
  $('date').disabled=!data.recent_dates.length;
  if(keepDate&&data.recent_dates.includes(oldDate))$('date').value=oldDate;
  else if(data.latest_trade_date)$('date').value=data.latest_trade_date;
@@ -242,6 +257,8 @@ function showDataQuality(data){
  if(q?.excluded_row_count)notes.push(q.excluded_row_count+' 只数据不足，未参与排名与候选判断；前30只覆盖有效数据。');
  if(q?.unranked_observation_count)notes.push(q.unranked_observation_count+' 只未排名观察记录。');
  if(p?.excluded_row_count)notes.push('来源另有 '+p.excluded_row_count+' 条缺失记录。');
+ if(p?.free_share_source_date&&!p.free_share_exact_date)notes.push('流通股本采用 '+pretty(p.free_share_source_date)+' 数据。');
+ if(p?.event_risk_complete===false)notes.push('事件风险资料覆盖不完整。');
  $('quality').hidden=!notes.length;
  $('qualitySummary').textContent=notes.join(' ');
  $('qualityButton').hidden=!q?.excluded_row_count;
@@ -253,11 +270,12 @@ function showDataQuality(data){
 }
 function showResult(data,prefix){
  result=data;
- $('health').textContent=data.data_quality?.excluded_row_count?'部分可用':data.data_healthy?'健康':'数据异常';
+ const historical=selectedStage==='history';
+ $('health').textContent=historical?'历史重建':data.data_quality?.excluded_row_count?'部分可用':data.data_healthy?'健康':'数据异常';
  $('observed').textContent=data.observed_at?.slice(11,19)||'—';
  $('total').textContent=data.total.toLocaleString();
  $('exposure').textContent=data.display?.exposure_weight==null?'未发布':number(data.display.exposure_weight*100,0)+'%';
- $('notice').textContent=prefix||'';
+ $('notice').textContent=[prefix,historical?'09:25 历史重建。'+(historicalSources[data.provenance?.kind]??'请按历史重建范围解读。'):''].filter(Boolean).join(' ');
  showDataQuality(data);
  const prior=data.previous_qualified;
  $('historyTitle').textContent='昨日 D-1 · 合格个股'+(prior?.trade_date?' · '+pretty(prior.trade_date):'');
