@@ -1,84 +1,355 @@
-<!doctype html><html lang="zh-CN"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>竞价监视器 V2 · 云端快照</title>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>竞价监视器 V2</title>
 <style>
-:root{--ink:#17332d;--muted:#73847d;--line:#e1e9e4;--accent:#126c59;--bg:#f3f6f3}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.6 "Microsoft YaHei UI","Segoe UI",sans-serif}button,input,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.4;cursor:not-allowed}button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #88cbb2;outline-offset:2px}header{background:white;border-bottom:1px solid var(--line)}.shell{max-width:1640px;margin:auto;padding:0 30px}.brand{display:flex;align-items:center;gap:14px;padding:20px 0}.logo{background:var(--accent);color:white;border-radius:12px;padding:6px 13px;font-size:24px}h1{font-size:21px;margin:0}small,.muted{color:var(--muted)}.badge{margin-left:auto;border:1px solid #cde1d5;background:#eff8f1;color:var(--accent);border-radius:22px;padding:5px 13px}.hero{padding:25px 0 20px}.eyebrow{font-size:11px;color:var(--accent);letter-spacing:.2em;font-weight:700}h2{font-size:28px;margin:5px 0}.hero p{margin:0;color:var(--muted)}.controls,.workspace,.history{background:#fff;border:1px solid var(--line);border-radius:14px}.controls{padding:18px 20px}.form{display:grid;grid-template-columns:1.2fr 1fr 1.3fr 2fr auto;gap:13px;align-items:end}label{display:grid;gap:6px;font-size:12px;color:var(--muted)}input,select{width:100%;min-width:0;border:1px solid #d6e2da;border-radius:8px;background:#fbfcfb;padding:10px 12px;color:var(--ink)}.primary{border:0;border-radius:8px;background:var(--accent);color:white;padding:11px 22px;font-weight:700}.security{font-size:12px;color:var(--muted);margin-top:12px}.steps{display:flex;gap:9px;padding:18px 0;overflow:auto}.step{white-space:nowrap;background:#fff;border:1px solid var(--line);border-radius:9px;padding:10px 18px;color:var(--muted)}.step.active{background:var(--accent);color:#fff;border-color:var(--accent)}.cards{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}.card{background:white;border:1px solid var(--line);border-radius:12px;padding:16px 18px}.card span,.card small{display:block;font-size:12px;color:var(--muted)}.card strong{display:block;font-size:24px;margin:4px 0;font-variant-numeric:tabular-nums}.card.accent{background:#eaf5ee;border-color:#cde1d4}.notice{font-size:12px;padding:12px 15px;border-radius:8px;background:#eaf0e9;color:#536f60;margin:16px 0}.notice.error{background:#fff0ed;color:#a13e38}.workspace{overflow:hidden;margin-top:18px}.toolbar{display:flex;gap:10px;align-items:center;padding:16px 18px;border-bottom:1px solid var(--line);flex-wrap:wrap}.tabs{display:flex;gap:5px;border-radius:8px;padding:4px;background:#f0f4f0}.tab{border:0;border-radius:5px;padding:8px 14px;background:none;color:var(--muted)}.tab.active{background:white;color:var(--accent);box-shadow:0 2px 5px #1630200c;font-weight:700}.toolbar label{margin-left:auto}.toolbar input{width:190px}.table-wrap{overflow:auto;max-height:65vh;min-height:230px}table{width:100%;border-collapse:separate;border-spacing:0;white-space:nowrap;font-variant-numeric:tabular-nums}th{position:sticky;top:0;background:#f7faf7;z-index:1;font-size:12px;color:var(--muted);font-weight:500}th,td{padding:12px 14px;text-align:right;border-bottom:1px solid #edf2ec}.text{text-align:left}tbody tr:hover{background:#f6faf6}tr.candidate td:first-child{border-left:3px solid var(--accent)}.stock,.score{font-weight:750}.tag{display:inline-block;background:#e9f5ec;color:#146950;border-radius:5px;padding:3px 8px;font-size:11px}.tag.neutral{color:var(--muted);background:#f0f3f0}.up{color:#bc4147}.down{color:#12825b}.empty{text-align:center;padding:55px 18px;color:var(--muted)}.empty strong{display:block;font-size:18px;color:#405a4c;margin-bottom:7px}.pager{display:flex;justify-content:space-between;gap:12px;padding:14px 18px;color:var(--muted);font-size:12px}.pager button{background:white;border:1px solid var(--line);border-radius:6px;padding:6px 12px;color:var(--ink);margin-left:6px}.history{margin:20px 0;overflow:hidden;border-top:3px solid #a396c3}.history h3{margin:0;padding:14px 18px;color:#725791;background:#faf8fd;font-size:14px}.history .table-wrap{min-height:100px;max-height:350px}.footer{display:flex;justify-content:space-between;gap:15px;flex-wrap:wrap;padding:4px 0 26px;font-size:11px;color:var(--muted)}@media(max-width:1000px){.form{grid-template-columns:repeat(2,1fr)}.form .primary{grid-column:span 2}.cards{grid-template-columns:repeat(3,1fr)}}@media(max-width:600px){.shell{padding:0 14px}.brand .badge{display:none}h2{font-size:23px}.cards{grid-template-columns:repeat(2,1fr)}.card{padding:12px}.card strong{font-size:20px}.form label:last-of-type{grid-column:span 2}.toolbar label{width:100%;margin-left:0}.toolbar input{width:100%}.tab{padding:7px 10px}.step{padding:9px 12px}.pager{flex-wrap:wrap}}
-</style></head><body>
-<header><div class="shell brand"><span class="logo" aria-hidden="true">↗</span><div><h1>竞价监视器 V2</h1><small>AUCTION OBSERVATORY / 云端快照</small></div><span class="badge">只读 · 私有访问</span></div></header>
-<main class="shell"><section class="hero"><div class="eyebrow">PRE-MARKET SNAPSHOTS</div><h2>竞价的每个关键时刻</h2><p>原始指数与资格判定 · 今日候选与昨日记录 · 跨电脑查看冻结门帧</p></section>
-<section class="controls"><form id="loginForm" class="form"><label>邀请制账号<input id="phone" type="tel" autocomplete="username" pattern="1[3-9][0-9]{9}" maxlength="11" placeholder="手机号（不发送短信）" required></label><label>密码<input id="password" type="password" autocomplete="current-password" minlength="8" maxlength="8" placeholder="管理员分配的8位密码" required></label><button class="primary" id="loginButton">登录</button><span id="loginState" role="status">尚未登录</span><button type="button" id="logoutButton" hidden>退出登录</button></form><div class="security">仅接受管理员邀请。记住登录7天；新登录使旧会话失效。密码不写入网页存储。</div></section>
-<section class="controls"><form id="query" class="form"><label>交易日期<input id="date" type="date" value="2026-09-30" required></label><label>服务器 ID<input id="server" value="local" pattern="[A-Za-z0-9_-]{1,32}" required></label><label>快照阶段<select id="stage"><option value="0915">09:15 门帧</option><option value="0920">09:20 门帧</option><option value="0924">09:24:59 门帧</option><option value="final" selected>09:25 原始冻结</option><option value="corrected">09:25 更正判定</option><option value="history">09:25历史重建</option></select></label><button id="submit" class="primary">刷新快照</button></form><div class="security">仅使用受邀账号登录；密码不写入网页存储。无交易或采集控制。</div></section>
-<nav class="steps" aria-label="竞价门帧"><button class="step" data-stage="0915">09:15 首门</button><button class="step" data-stage="0920">09:20 二门</button><button class="step" data-stage="0924">09:24:59 确认帧</button><button class="step active" data-stage="final">09:25 原始冻结</button><button class="step" data-stage="corrected">09:25 更正判定</button><button class="step" data-stage="history">09:25历史重建</button></nav>
-<section class="cards"><div class="card accent"><span>数据健康</span><strong id="health">—</strong><small>保存时的真实健康状态</small></div><div class="card"><span>当前阶段</span><strong id="stageLabel">尚未查询</strong><small id="time">快照时间 —</small></div><div class="card"><span>查询范围总数</span><strong id="total">—</strong><small id="scope">尚未读取</small></div><div class="card"><span>本页资格通过</span><strong id="qualifiedCount">—</strong><small>不代表确定性高或可成交</small></div><div class="card"><span>预期可用仓位</span><strong id="exposure">未发布</strong><small>市场状态结果，与个人持仓无关</small></div></section>
-<div id="notice" class="notice" role="status" aria-live="polite">请选择日期与门帧，登录后查询。未发布数据不使用其他时点结果替代。</div>
-<section class="workspace"><div class="toolbar"><div class="tabs" role="tablist" aria-label="候选列表"><button role="tab" aria-selected="true" class="tab active" data-view="top">竞价指数前30</button><button role="tab" aria-selected="false" class="tab" data-view="qualified">基础与历史门通过</button><button role="tab" aria-selected="false" class="tab" data-view="all">全市场明细</button></div><label>当前页筛选<input id="search" inputmode="numeric" maxlength="6" placeholder="搜索股票代码"></label></div><div class="table-wrap" id="table"><div class="empty"><strong>等待第一份快照</strong>此处展示服务器已冻结、去敏发布的真实结果。</div></div><div class="pager"><span id="pageInfo">尚未载入</span><div><button id="previous" disabled>上一页</button><button id="next" disabled>下一页</button></div></div></section>
-<section class="history"><h3 id="historyTitle">昨日 D-1 · 合格个股</h3><div id="history" class="table-wrap"><div class="empty">尚未读取上一交易日快照</div></div></section>
-<div class="notice">名称来自冻结快照；未发布名称显示“未发布”。当前公开数据不含指数路径、策略层与排除原因。缺失不等于“无排除原因”；本页不重新计算策略。09:15、09:20 不显示排除原因列。原始冻结与更正版本独立。</div>
-<footer class="footer"><span>已冻结快照 ≠ 实时采集 · 09:25 后不能假设按已完成的开盘撮合价成交</span><span id="fingerprint">来源指纹 —</span></footer></main>
+:root{color-scheme:light;--bg:#f4f6f8;--paper:#fff;--line:#dfe5ec;--ink:#0f172a;--muted:#526174;--accent:#126457;--green:#eaf7ef;--purple:#6743a5}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 "Microsoft YaHei UI","Segoe UI",sans-serif;font-variant-numeric:tabular-nums}
+button,input,select{font:inherit;color:inherit}button,input,select{min-height:34px;border:1px solid var(--line);border-radius:6px;background:white;padding:5px 10px}button{cursor:pointer}button:disabled{cursor:default;opacity:.48}button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.primary,[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:white}
+h1,h2,p{margin:0}h1{font-size:17px}h2{font-size:15px}small,.muted{color:var(--muted)}label{display:grid;gap:4px}
+#boot,#authGate{min-height:100dvh;display:grid;place-items:center;padding:16px}
+.login{width:min(100%,360px);padding:26px;display:grid;gap:16px}.login form,.invite{display:grid;gap:12px}.card,.login{border:1px solid var(--line);border-radius:9px;background:var(--paper)}
+header{position:sticky;top:0;z-index:2;background:var(--paper);border-bottom:1px solid var(--line)}
+.bar,main{max-width:1500px;margin:auto;padding:0 20px}.bar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding-top:9px;padding-bottom:9px}.brand{margin-right:10px}.identity{margin-left:auto;color:var(--muted)}.segments{display:flex;flex-wrap:wrap;gap:4px}
+main{padding-top:12px;padding-bottom:24px;display:grid;gap:10px;min-width:0}.kpi,.toolbar,.pagination,.dialogHead{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px;padding:9px 12px}.kpi{color:var(--muted)}.kpi strong{color:var(--ink);margin-left:5px}.toolbar{justify-content:space-between}.search{min-width:0;width:min(100%,220px)}.status{font-size:13px;color:var(--muted);overflow-wrap:anywhere}.warning{color:#854b10}.error{color:#a52532}.pagination{justify-content:flex-end}
+.scroll{overflow-x:auto;min-width:0;max-width:100%}table{width:100%;border-collapse:collapse;white-space:nowrap}th,td{text-align:right;padding:7px 10px;border-bottom:1px solid var(--line)}th{background:#f8fafc;color:var(--muted);font-weight:600}th button{min-height:0;padding:0;border:0;background:transparent;color:inherit;font-weight:inherit}th:nth-child(2),th:nth-child(3),td:nth-child(2),td:nth-child(3){text-align:left}tr.qualified{background:var(--green)}tr.qualified td:first-child{box-shadow:inset 3px 0 #21834d}.risk{background:#fdebed;color:#a51f31}.low{background:#fff1dc;color:#93480c}.empty{padding:20px;text-align:center;color:var(--muted)}.mobileMeta{display:none}
+.prior{border-top:3px solid var(--purple)}.prior h2{padding:9px 12px;color:var(--purple)}details{padding:8px 12px}summary{cursor:pointer}
+dialog{border:1px solid var(--line);border-radius:10px;width:min(560px,calc(100% - 24px));max-height:88dvh;color:var(--ink);padding:0;overflow:auto}dialog::backdrop{background:#0f172a66}.dialogHead{justify-content:space-between;border-bottom:1px solid var(--line)}.dialogBody{padding:14px;display:grid;gap:12px}.account,.credential{padding:10px;border:1px solid var(--line);border-radius:7px}.account .segments{margin-top:6px}.credential{background:#fff5db;overflow-wrap:anywhere}.check{display:flex;align-items:center;gap:7px}.check input{min-height:auto}.qualityRows{margin:0;padding-left:22px;overflow-wrap:anywhere}
+@media(max-width:700px){.bar,main{padding-left:10px;padding-right:10px}.bar{gap:5px}.brand{flex:1 0 55%;margin:0}.identity{margin-left:0}.kpi,.toolbar{gap:6px 10px}.search{width:100%}.scroll{overflow-x:visible}table{white-space:normal;table-layout:fixed}th,td{padding:5px 3px;font-size:11px;overflow-wrap:anywhere}th:nth-child(1){width:8%}th:nth-child(2){width:14%}th:nth-child(3){width:18%}th:nth-child(8),td:nth-child(8){display:none}.mobileMeta{display:block;color:var(--muted);font-size:10px}}
+@media(max-width:700px){th.extra,td.extra{display:none}.mobileMeta small{display:block}}
+</style>
+</head>
+<body>
+<div id="boot" role="status">正在检查登录状态…</div>
+<section id="authGate" hidden>
+ <div class="login"><h1>竞价监视器 V2</h1><p class="muted">请使用受邀账号登录</p>
+ <form id="loginForm">
+  <label>手机号<input id="phone" type="tel" autocomplete="username" required></label>
+  <label>密码<input id="password" type="password" autocomplete="current-password" required></label>
+  <button id="loginButton" class="primary">登录</button>
+ </form><p id="loginState" class="status" role="status"></p></div>
+</section>
+<div id="appShell" hidden>
+ <header><div class="bar">
+  <h1 class="brand">竞价监视器 V2</h1>
+  <select id="server" aria-label="服务器" hidden></select>
+  <select id="date" aria-label="交易日"></select>
+  <div class="segments" aria-label="竞价阶段">
+   <button data-stage="0915">09:15 门帧</button><button data-stage="0920">09:20 门帧</button><button data-stage="final">09:25 冻结</button>
+  </div>
+  <button id="refresh">刷新</button><span id="health" class="muted" role="status"></span>
+  <span id="identity" class="identity"></span><button id="manageButton" hidden>账号管理</button><button id="logoutButton">退出登录</button>
+ </div></header>
+ <main>
+  <div class="kpi card"><span>快照<strong id="observed">—</strong></span><span>当前榜单<strong id="total">—</strong></span><span>市场仓位参考<strong id="exposure">—</strong></span></div>
+  <p id="notice" class="status" role="status"></p>
+  <div id="quality" class="kpi card warning" hidden><span id="qualitySummary"></span><button id="qualityButton" hidden>查看缺失明细</button></div>
+  <section class="card" aria-label="竞价榜单">
+   <div class="toolbar"><div class="segments" aria-label="榜单">
+    <button data-view="top" aria-pressed="true">竞价指数前30</button><button data-view="qualified" aria-pressed="false">基础与历史门通过</button><button data-view="all" aria-pressed="false">排名明细</button>
+   </div><input id="search" class="search" aria-label="筛选当前页" placeholder="筛选当前页代码或名称"></div>
+   <div id="table" class="scroll"></div>
+   <div class="pagination"><span id="pageInfo" class="muted"></span><button id="previous" disabled>上一页</button><button id="next" disabled>下一页</button></div>
+  </section>
+  <section class="card prior"><h2 id="historyTitle">昨日 D-1 · 合格个股</h2><div id="history" class="scroll"></div></section>
+  <details class="card"><summary>竞价指数 0.5 参考提示</summary><p class="muted">合格股指数低于 0.5 时标橙色。提示供查看，不改变已保存资格。</p></details>
+ </main>
+</div>
+<dialog id="qualityDialog"><div class="dialogHead"><h2>数据不足明细</h2><form method="dialog"><button>关闭</button></form></div><div class="dialogBody"><ul id="qualityRows" class="qualityRows"></ul></div></dialog>
+<dialog id="accountsDialog">
+ <div class="dialogHead"><h2>账号管理</h2><form method="dialog"><button>关闭</button></form></div>
+ <div class="dialogBody">
+  <form id="createForm" class="invite">
+   <label>手机号<input id="invitePhone" type="tel" pattern="1[3-9][0-9]{9}" required></label>
+   <label>8 位英文和数字密码<input id="invitePassword" type="password" minlength="8" maxlength="8" autocomplete="new-password" placeholder="留空自动生成"></label>
+   <label class="check"><input id="makeAdmin" type="checkbox">设为管理员</label>
+   <button class="primary">创建受邀账号</button>
+  </form>
+  <div id="credential" class="credential" hidden><p id="credentialText"></p><button id="copy">复制账号和密码</button></div>
+  <p id="accountStatus" class="status" role="status"></p><div id="accounts"></div>
+ </div>
+</dialog>
 <script>
-'use strict';const $=id=>document.getElementById(id),labels={'0915':'09:15','0920':'09:20','0924':'09:24:59',final:'09:25 冻结',corrected:'09:25 更正',history:'09:25历史重建'};let result=null,view='top',offset=0,busy=false,loadedArgs=null,signedIn=false,sessionEpoch=0,requestSerial=0,activeController=null;const viewCache=new Map();
-const esc=v=>String(v??'—').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const number=(v,d=2)=>typeof v==='number'&&Number.isFinite(v)?v.toFixed(d):'—';
-function money(v){if(typeof v!=='number'||!Number.isFinite(v))return'—';return Math.abs(v)>=1e8?number(v/1e8)+' 亿':Math.abs(v)>=1e4?number(v/1e4)+' 万':number(v,0)}
-function displayColumns(stage){const cols=[['qualified','候选'],['rank','排名'],['code','代码'],['name','名称'],['score','竞价指数'],['gap_pct','竞价涨幅'],['matched_price','撮合价'],['matched_amount_yuan','匹配额'],['unmatched_buy_amount_yuan','未匹配买'],['unmatched_sell_amount_yuan','未匹配卖'],['turnover_pct','竞价换手']];if(!['0915','0920'].includes(stage))cols.push(['exclusion_reasons','排除原因']);return cols}
-function cell(k,r){const v=r[k];if(k==='name')return esc(v||'未发布');if(k==='qualified')return r.qualified?'<span class="tag">★ 通过</span>':'<span class="tag neutral">未通过</span>';if(k==='exclusion_reasons')return'<span class="muted">未发布，无法展示</span>';if(k.endsWith('_yuan'))return esc(money(v));if(k==='gap_pct')return'<span class="'+(v>0?'up':v<0?'down':'')+'">'+(v>0?'+':'')+number(v)+'%</span>';if(k==='turnover_pct')return number(v,3)+'%';if(k==='score')return'<span class="score">'+number(v,3)+'</span>';if(k==='matched_price')return number(v);return esc(v)}
-function tableHtml(rows,stage){if(!rows.length)return'<div class="empty"><strong>当前范围没有记录</strong>不推断其他日期或门帧的结果。</div>';const cols=displayColumns(stage);return'<table><thead><tr>'+cols.map(([k,t])=>'<th scope="col" class="'+(['qualified','code','name','exclusion_reasons'].includes(k)?'text':'')+'">'+t+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr class="'+(r.qualified?'candidate':'')+'">'+cols.map(([k])=>'<td class="'+(['qualified','code','name','exclusion_reasons'].includes(k)?'text ':'')+(k==='code'?'stock':'')+'">'+cell(k,r)+'</td>').join('')+'</tr>').join('')+'</tbody></table>'}
-function render(){if(!result)return;const needle=$('search').value.trim();$('table').innerHTML=tableHtml(result.rows.filter(r=>r.code.includes(needle)),loadedArgs.stage);$('qualifiedCount').textContent=result.rows.filter(r=>r.qualified).length;$('pageInfo').textContent='共 '+result.total+' 条 · '+(result.rows.length?(result.offset+1)+'–'+(result.offset+result.rows.length):'0')+' 条'+(needle?' · 筛选仅限当前页':'');$('previous').disabled=busy||view==='top'||result.offset===0;$('next').disabled=busy||view==='top'||result.offset+result.rows.length>=result.total}
-function reset(){result=null;loadedArgs=null;offset=0;$('table').innerHTML=signedIn?'<div class="empty"><strong>已登录 · 正在读取快照</strong>当前日期与阶段独立读取。</div>':'<div class="empty"><strong>尚未登录</strong>请使用受邀账号登录。</div>';['health','total','qualifiedCount'].forEach(id=>$(id).textContent='—');$('exposure').textContent='未发布';$('stageLabel').textContent='尚未查询';$('time').textContent='快照时间 —';$('scope').textContent='尚未读取';$('pageInfo').textContent='尚未载入';$('fingerprint').textContent='来源指纹 —';$('historyTitle').textContent='昨日 D-1 · 合格个股';$('history').innerHTML='<div class="empty">尚未读取上一交易日快照</div>';$('previous').disabled=$('next').disabled=true}
-function selectStage(stage){$('stage').value=stage;document.querySelectorAll('[data-stage]').forEach(b=>b.classList.toggle('active',b.dataset.stage===stage));reset();return query()}
-const errors={UNAUTHORIZED:'凭证无效或已过期，请重新输入。',FORBIDDEN:'无权读取此服务器或请求来源。',DATA_MISSING:'该日期或阶段尚未发布。',RATE_LIMITED:'请求频繁，请稍后重试。',AUDIT_UNAVAILABLE:'审计暂不可用，已安全拒绝返回数据。',CONTROL_UNAVAILABLE:'限流暂不可用，已安全拒绝返回数据。',QUERY_TIMEOUT:'查询超时，请稍后重试。',DATE_INVALID:'日期无效或为未来日期。'};
-function showResult(data,args){result=data;loadedArgs=args;offset=data.offset;const gated=data.interpretation==='historical_gate_conditioned_result',historical=gated||data.interpretation==='historical_archive_final_result',p=data.provenance||{};$('health').textContent=data.data_healthy?'健康':'异常';$('stageLabel').textContent=labels[args.stage];$('time').textContent='快照时间 '+data.observed_at.slice(11,19);$('total').textContent=data.total.toLocaleString();$('scope').textContent=historical?(gated?'09:20门通过池（非全市场）':(p.kind==='historical_capture_final_v2'?'已捕获主板观测（非全市场）':'主板归档范围（含缺失）')):(view==='qualified'?'保存资格通过的记录':'全部有效记录');document.querySelector('[data-view="all"]').textContent=historical?(gated?'门控池明细':'归档明细'):'全市场明细';$('exposure').textContent=data.display?.exposure_weight==null?'未发布':number(data.display.exposure_weight*100,0)+'%';$('fingerprint').textContent='来源 SHA-256 '+data.source_sha256.slice(0,16)+'…';$('fingerprint').title=data.source_sha256;const previous=data.previous_qualified;$('historyTitle').textContent='昨日 D-1 · '+(previous?.trade_date||'交易日未发布')+' · 合格个股';$('history').innerHTML=previous?.status==='published'?'<div class="notice">'+esc(previous.stage)+' · 共 '+previous.total+' 只 · '+(previous.data_healthy?'保存时健康':'保存时异常')+(previous.total>previous.rows.length?' · 展示前 '+previous.rows.length+' 条':'')+'</div>'+tableHtml(previous.rows,previous.stage):'<div class="empty">上一交易日或对应云端快照未发布，不用自然日减一天替代。</div>';const rowWarning=p.excluded_row_count?'；来源 '+p.source_row_count+' 条，发布 '+p.published_row_count+' 条，因点时字段缺失排除 '+p.excluded_row_count+' 条。':'。';const historicalWarning=historical?(gated?'历史银河门控补测，仅含09:20金额门通过池，不是全市场排名；流通股本来源日 ':(p.kind==='historical_capture_final_v2'?'本机原始推送09:25重建，仅已捕获观测范围，非全市场；流通股本来源日 ':'主板归档09:25历史重建，不是当年实时冻结，缺失证券未补造；流通股本来源日 '))+esc(p.free_share_source_date||'未发布')+(p.free_share_exact_date?'（当日）':'（非当日）')+rowWarning+(p.event_risk_complete?'':'重大利空公告覆盖未完成。'):'';$('notice').textContent=args.trade_date+' · 已读取服务器真实快照 · '+(data.data_healthy?'保存时健康':'保存时异常，请勿当作有效确认')+'。'+historicalWarning+(['0915','0920'].includes(args.stage)?'本阶段隐藏排除原因。':'排除原因未发布。');$('notice').className=data.data_healthy?'notice':'notice error';render()}
-function showDataQuality(data){
- const q=data.data_quality;if(!q?.excluded_row_count)return;
- $('health').textContent='部分可用';
- $('scope').textContent+=' · 仅有效数据排名';
- const fields={score:'竞价指数',gap_pct:'竞价涨幅',matched_price:'撮合价',matched_volume_lots:'撮合量',matched_amount_yuan:'撮合金额',turnover_pct:'换手率',unmatched_buy_amount_yuan:'未匹配买额',unmatched_sell_amount_yuan:'未匹配卖额',unmatched_buy_turnover_pct:'未匹配买换手率',unmatched_sell_turnover_pct:'未匹配卖换手率'};
- const message='已读取 '+q.source_row_count+' 只，可排名 '+q.valid_row_count+' 只；'+q.excluded_row_count+' 只数据不足，已隔离且不参与排名和候选判断。'+(q.unranked_observation_count?'另有 '+q.unranked_observation_count+' 只原快照未纳入排名的观察记录，仍不参与策略榜单。':'')+'排名仅覆盖有效数据，不能保证全市场前30。';
- const prior=$('notice').textContent.replace('保存时异常，请勿当作有效确认',q.source_data_healthy?'原快照标记健康，查询发现部分字段缺失':'原快照标记异常');
- $('notice').innerHTML=esc(prior)+'<br>'+esc(message)+'<details><summary>查看数据不足个股及缺失字段</summary>'+q.excluded_rows.map(r=>esc(r.code)+' · '+esc(data.display?.stock_names?.[r.code]||'')+' · 数据不足：'+r.fields.map(f=>esc(fields[f]||f)).join('、')).join('<br>')+'</details>';
- $('notice').className='notice';
+'use strict';
+const $=id=>document.getElementById(id);
+const stages=[...document.querySelectorAll('[data-stage]')], views=[...document.querySelectorAll('[data-view]')];
+const stageOrder=['final','0920','0915'], pageSize=100, viewCache=new Map();
+const labels={final:'09:25 冻结',corrected:'09:25 修正'};
+const columns=[['rank','名次'],['code','代码'],['name','名称'],['score','竞价指数'],['gap_pct','竞价涨幅'],['matched_amount_yuan','匹配额'],['turnover_pct','竞价换手'],['qualified','资格'],['matched_price','撮合价'],['unmatched_buy_amount_yuan','未匹配买'],['unmatched_sell_amount_yuan','未匹配卖']];
+const extraFields=new Set(columns.slice(8).map(([key])=>key));
+const sortable=new Set(['score','gap_pct','matched_amount_yuan','turnover_pct']);
+const qualityFields={score:'竞价指数',gap_pct:'竞价涨幅',matched_price:'撮合价',matched_volume_lots:'撮合量',matched_amount_yuan:'撮合金额',turnover_pct:'换手率',unmatched_buy_amount_yuan:'未匹配买额',unmatched_sell_amount_yuan:'未匹配卖额',unmatched_buy_turnover_pct:'未匹配买换手率',unmatched_sell_turnover_pct:'未匹配卖换手率'};
+const errors={FORBIDDEN:'没有操作权限。',RATE_LIMITED:'请求过多，请稍后重试。',DATA_MISSING:'该日期或阶段尚未发布。',SOURCE_UNAVAILABLE:'暂时无法读取快照存储。',QUERY_TIMEOUT:'读取超时，请重试。',ACCOUNT_EXISTS:'该手机号已受邀。',ACCOUNT_LIMIT:'已达到账号数量上限。',PARAMETERS_INVALID:'请检查输入。密码须为 8 位英文字母和数字的组合。',ACCOUNT_MISSING:'账号不存在。',CONTROL_UNAVAILABLE:'会话或限流服务暂不可用。',AUDIT_UNAVAILABLE:'审计服务暂不可用。'};
+let session=null, epoch=0, sequence=0, active=null, selectedStage=null, view='top', catalog=null;
+let result=null, order=null, busy=false, accountBusy=false;
+const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).filter(part=>part.type!=='literal').map(part=>part.value).join('');
+const pretty=day=>day.replace(/^(....)(..)(..)$/,'$1-$2-$3');
+const number=(value,digits)=>value==null?'—':Number(value).toLocaleString('zh-CN',{maximumFractionDigits:digits,minimumFractionDigits:digits});
+const option=(value,label)=>new Option(label,value);
+function clearCredential(){
+ $('credential').hidden=true;
+ $('credentialText').textContent='';
+ $('invitePassword').value='';
 }
-function invalidateSession(){signedIn=false;sessionEpoch++;requestSerial++;activeController?.abort();viewCache.clear();busy=false;reset();$('logoutButton').hidden=true}
-async function query(pageOffset=0,force=false){
- if(!signedIn){$('notice').className='notice error';$('notice').textContent='请先使用受邀账号登录。';$('phone').focus();return}
- const args={trade_date:$('date').value.replaceAll('-',''),server_id:$('server').value.trim(),stage:$('stage').value,limit:view==='top'?30:100,offset:pageOffset,qualified_only:view==='qualified'};
- const serial=++requestSerial,epoch=sessionEpoch,key=JSON.stringify(args);
- activeController?.abort();const controller=new AbortController();activeController=controller;busy=true;
- $('submit').disabled=true;$('previous').disabled=$('next').disabled=true;
- $('notice').className='notice';$('notice').textContent='已登录 · 正在读取 '+args.trade_date+' / '+labels[args.stage]+'…（切换模块不会丢失请求）';
- const timer=setTimeout(()=>controller.abort(),20000);
- try{
-  const cached=viewCache.get(key);let data,response;
-  if(!force&&cached&&Date.now()-cached.savedAt<300000){
-   response=await fetch('/api/auth/me',{credentials:'same-origin',cache:'no-store',signal:controller.signal});
-   if(response.ok){await response.json();data=cached.data}
-  }else{
-   response=await fetch('/api/auction/view',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(args),credentials:'same-origin',signal:controller.signal,cache:'no-store'});
-  }
-  if(serial!==requestSerial||epoch!==sessionEpoch)return;
-  if(!response.ok){
-   const failure=await response.json().catch(()=>({}));
-   if(response.status===401){invalidateSession();$('loginState').textContent='登录失效，请重新登录；可能已在另一台设备登录。'}
-   const code=failure.error?.code||'HTTP_'+response.status;
-   throw new Error((errors[code]||'查询失败：'+code)+'（请求编号 '+(failure.error?.request_id||'未返回')+'）')
-  }
-  if(!data)data=await response.json();
-  if(serial!==requestSerial||epoch!==sessionEpoch)return;
-  viewCache.set(key,{data,savedAt:cached&&data===cached.data?cached.savedAt:Date.now()});if(viewCache.size>20)viewCache.delete(viewCache.keys().next().value);
-  showResult(data,args);
-  showDataQuality(data);
- }catch(error){
-  if((serial!==requestSerial||epoch!==sessionEpoch)&&signedIn)return;
-  if(serial!==requestSerial&&error.name==='AbortError')return;
-  reset();$('table').innerHTML=signedIn?'<div class="empty"><strong>已登录 · 快照暂不可用</strong>请查看上方原因；切换模块可继续，刷新按钮可重试。</div>':$('table').innerHTML;
-  $('notice').className='notice error';$('notice').textContent=error.name==='AbortError'?'读取超过20秒，请点击刷新重试。':error instanceof TypeError?'网络请求失败，请检查连接。':error.message;
- }finally{
-  clearTimeout(timer);if(serial===requestSerial||!signedIn){busy=false;$('submit').disabled=false;if(result)render()}
+function resetData(){
+ result=null;
+ $('table').textContent='';$('history').textContent='';$('historyTitle').textContent='昨日 D-1 · 合格个股';
+ for(const id of ['observed','total','exposure'])$(id).textContent='—';
+ $('health').textContent='';$('notice').textContent='';$('pageInfo').textContent='';
+ $('quality').hidden=true;$('qualityRows').textContent='';$('qualityDialog').close();
+ $('previous').disabled=$('next').disabled=true;
+}
+function signOut(message=''){
+ epoch++;sequence++;active?.abort();session=null;catalog=null;selectedStage=null;order=null;busy=false;
+ viewCache.clear();resetData();clearCredential();$('accountsDialog').close();$('accounts').textContent='';
+ $('accountStatus').textContent='';$('createForm').reset();$('search').value='';$('date').replaceChildren();$('server').replaceChildren();
+ $('password').value='';$('manageButton').hidden=true;$('appShell').hidden=true;$('boot').hidden=true;
+ $('loginState').textContent=message;$('authGate').hidden=false;
+}
+async function api(path,{body,signal,silent=false}={}){
+ const current=epoch;
+ const response=await fetch(path,{method:body===undefined?'GET':'POST',credentials:'same-origin',cache:'no-store',
+  headers:body===undefined?{}:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),signal:signal??AbortSignal.timeout(15000)});
+ if(current!==epoch)throw new DOMException('旧会话请求','AbortError');
+ if(response.status===401){
+  const message=path==='/api/auth/login'?'手机号或密码错误。':'登录已失效，请重新登录。可能已在另一台设备登录。';
+  signOut(silent?'':message);
+  throw new Error(message);
+ }
+ const data=await response.json();
+ if(!response.ok)throw new Error(errors[data.error?.code]||'请求失败（'+(data.error?.code||response.status)+'）');
+ return data;
+}
+function begin(){
+ sequence++;active?.abort();active=new AbortController();
+ return {id:sequence,session:epoch,signal:AbortSignal.any([active.signal,AbortSignal.timeout(18000)])};
+}
+function current(task){return session&&task.id===sequence&&task.session===epoch}
+function setStage(preferred){
+ const available=catalog?.stages_by_date?.[$('date').value]??(catalog?[]:stageOrder);
+ selectedStage=available.includes(preferred)?preferred:stageOrder.find(stage=>available.includes(stage))??null;
+ for(const button of stages){
+  button.disabled=!available.includes(button.dataset.stage);
+  button.setAttribute('aria-pressed',String(button.dataset.stage===selectedStage));
  }
 }
-$('query').addEventListener('submit',e=>{e.preventDefault();query(0,true)});$('search').addEventListener('input',render);$('stage').onchange=()=>selectStage($('stage').value);document.querySelectorAll('[data-stage]').forEach(b=>b.onclick=()=>selectStage(b.dataset.stage));document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{view=b.dataset.view;document.querySelectorAll('[data-view]').forEach(t=>{t.classList.toggle('active',t===b);t.setAttribute('aria-selected',String(t===b))});reset();return query()});$('date').onchange=()=>{reset();return query()};$('server').onchange=()=>{reset();return query()};$('previous').onclick=()=>query(Math.max(0,offset-100));$('next').onclick=()=>query(offset+100);
-async function authFetch(path,args){const response=await fetch(path,{method:args?'POST':'GET',headers:{...(args?{'Content-Type':'application/json'}:{})},body:args?JSON.stringify(args):undefined,credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(15000)});let data;try{data=await response.json()}catch(_){throw new Error('服务暂不可用')}if(!response.ok){if(response.status===401){invalidateSession();$('loginState').textContent='登录失效，请重新登录；可能已在另一台设备登录。';$('logoutButton').hidden=true}throw new Error(({UNAUTHORIZED:'账号或密码错误，或登录已失效。',FORBIDDEN:'没有权限或请求来源无效。',RATE_LIMITED:'尝试过多，请稍后再试。',ACCOUNT_EXISTS:'该账号已存在。',ACCOUNT_LIMIT:'账号数量已达上限。',PARAMETERS_INVALID:'请检查手机号及8位英文数字密码。',NOT_FOUND:'邀请登录尚未启用。'}[data.error?.code])||'操作失败：'+(data.error?.code||'HTTP_'+response.status))}return data}
-async function checkLogin(autoLoad=false){try{const data=await authFetch('/api/auth/me');signedIn=true;$('loginState').textContent='已登录';$('logoutButton').hidden=false;if(autoLoad)await query()}catch(error){signedIn=false;$('loginState').textContent=error.message}}
-$('loginForm').onsubmit=async e=>{e.preventDefault();$('loginButton').disabled=true;const args={phone:$('phone').value,password:$('password').value};$('password').value='';try{await authFetch('/api/auth/login',args);sessionEpoch++;viewCache.clear();activeController?.abort();reset();await checkLogin(true)}catch(error){$('loginState').textContent=error.message}finally{$('loginButton').disabled=false}};
-$('logoutButton').onclick=async()=>{try{await authFetch('/api/auth/logout',{});invalidateSession();$('loginState').textContent='已退出登录';$('logoutButton').hidden=true;}catch(error){$('loginState').textContent=error.message}};
-errors.UNAUTHORIZED='登录失效（可能已在另一设备登录），请重新登录。';
-window.addEventListener('pagehide',()=>{$('password').value='';viewCache.clear();activeController?.abort()});checkLogin(true);
-</script></body></html>
+async function loadCatalog(server,keepDate=false){
+ const task=begin(), oldDate=$('date').value, oldStage=selectedStage;
+ resetData();$('notice').textContent='正在读取已发布交易日…';
+ selectedStage=null;
+ for(const button of stages){button.disabled=true;button.setAttribute('aria-pressed','false')}
+ $('date').disabled=true;
+ let data;
+ try{
+  data=await api('/api/auction/latest'+(server?'?'+new URLSearchParams({server_id:server}):''),{signal:task.signal});
+ }catch(error){
+  if(!current(task))return;
+  catalog=null;
+  $('server').hidden=true;
+  $('server').replaceChildren(option(server||'local',server||'local'));
+  $('date').replaceChildren(option(today(),pretty(today())));
+  $('date').disabled=false;
+  setStage('final');
+  return query(0,true,'发布目录暂不可用，已尝试上海当天日期。');
+ }
+ if(!current(task))return;
+ catalog=data;
+ $('server').replaceChildren(...data.server_ids.map(id=>option(id,id)));
+ $('server').value=data.server_id??data.default_server_id;
+ $('server').hidden=data.server_ids.length<2;
+ $('date').replaceChildren(...data.recent_dates.map(day=>option(day,pretty(day))));
+ $('date').disabled=!data.recent_dates.length;
+ if(keepDate&&data.recent_dates.includes(oldDate))$('date').value=oldDate;
+ else if(data.latest_trade_date)$('date').value=data.latest_trade_date;
+ setStage(keepDate?oldStage:data.latest_stage);
+ if(!selectedStage){$('notice').textContent='暂无已发布的 09:15、09:20 或 09:25 快照。';return}
+ return query(0,true);
+}
+function rowCell(row,key){
+ const value=row[key];
+ if(key.endsWith('_amount_yuan'))return value==null?'—':number(value/10000,0)+' 万';
+ if(key==='matched_price')return number(value,2);
+ if(key==='score')return number(value,3);
+ if(key==='gap_pct'||key==='turnover_pct')return value==null?'—':number(value,2)+'%';
+ if(key==='qualified')return row.qualified?'通过':'—';
+ if(key==='name')return esc(value||'—')+(row.qualified?'<span class="mobileMeta">通过</span>':'')
+  +'<details class="mobileMeta"><summary>行情</summary>'+columns.slice(8).map(([field,label])=>'<small>'+label+' '+rowCell(row,field)+'</small>').join('')+'</details>';
+ return esc(value);
+}
+function tableHtml(rows,canSort=false){
+ if(!rows.length)return '<p class="empty">当前范围没有记录</p>';
+ const heading=columns.map(([key,label])=>{
+  const direction=canSort&&order?.key===key?(order.desc?'descending':'ascending'):'none';
+  return canSort&&sortable.has(key)?'<th scope="col" aria-sort="'+direction+'"><button data-sort="'+key+'">'+label+(direction==='none'?' ↕':direction==='descending'?' ↓':' ↑')+'</button></th>':'<th scope="col" class="'+(extraFields.has(key)?'extra':'')+'">'+label+'</th>';
+ }).join('');
+ const body=rows.map(row=>'<tr class="'+(row.qualified?'qualified':'')+'">'+columns.map(([key])=>{
+  const value=row[key];
+  const risk=(key==='score'&&value>=.6&&value<=.8)||(key==='turnover_pct'&&value>=2&&value<=3);
+  const low=key==='score'&&row.qualified&&value!=null&&value<.5;
+  return '<td class="'+(extraFields.has(key)?'extra ':'')+(risk?'risk':low?'low':'')+'">'+rowCell(row,key)+'</td>';
+ }).join('')+'</tr>').join('');
+ return '<table><thead><tr>'+heading+'</tr></thead><tbody>'+body+'</tbody></table>';
+}
+function render(){
+ if(!result)return;
+ const needle=$('search').value.trim().toLowerCase();
+ const rows=result.rows.filter(row=>String(row.code).includes(needle)||String(row.name??'').toLowerCase().includes(needle));
+ if(order)rows.sort((a,b)=>(order.desc?-1:1)*(a[order.key]-b[order.key])||a.rank-b.rank);
+ $('table').innerHTML=tableHtml(rows,true);
+ $('pageInfo').textContent=result.rows.length?(result.offset+1)+'–'+(result.offset+result.rows.length)+' / '+result.total+(needle?' · 筛中 '+rows.length+' 条':''):'0 / '+result.total;
+ $('previous').disabled=busy||view==='top'||result.offset===0;
+ $('next').disabled=busy||view==='top'||result.offset+result.rows.length>=result.total;
+}
+function showDataQuality(data){
+ const q=data.data_quality,p=data.provenance;
+ const notes=[];
+ if(q?.excluded_row_count)notes.push(q.excluded_row_count+' 只数据不足，未参与排名与候选判断；前30只覆盖有效数据。');
+ if(q?.unranked_observation_count)notes.push(q.unranked_observation_count+' 只未排名观察记录。');
+ if(p?.excluded_row_count)notes.push('来源另有 '+p.excluded_row_count+' 条缺失记录。');
+ $('quality').hidden=!notes.length;
+ $('qualitySummary').textContent=notes.join(' ');
+ $('qualityButton').hidden=!q?.excluded_row_count;
+ $('qualityRows').replaceChildren(...(q?.excluded_rows??[]).map(row=>{
+  const item=document.createElement('li');
+  item.textContent=[row.code,data.display?.stock_names?.[row.code],row.fields.map(field=>qualityFields[field]||field).join('、')].filter(Boolean).join(' · ');
+  return item;
+ }));
+}
+function showResult(data,prefix){
+ result=data;
+ $('health').textContent=data.data_quality?.excluded_row_count?'部分可用':data.data_healthy?'健康':'数据异常';
+ $('observed').textContent=data.observed_at?.slice(11,19)||'—';
+ $('total').textContent=data.total.toLocaleString();
+ $('exposure').textContent=data.display?.exposure_weight==null?'未发布':number(data.display.exposure_weight*100,0)+'%';
+ $('notice').textContent=prefix||'';
+ showDataQuality(data);
+ const prior=data.previous_qualified;
+ $('historyTitle').textContent='昨日 D-1 · 合格个股'+(prior?.trade_date?' · '+pretty(prior.trade_date):'');
+ $('history').innerHTML=prior?.status==='published'
+  ?'<div class="kpi">'+esc(labels[prior.stage]||prior.stage)+' · '+esc(prior.total)+' 只'+(prior.total>prior.rows.length?' · 展示前 '+esc(prior.rows.length)+' 条':'')+'</div>'+tableHtml(prior.rows)
+  :'<p class="empty">上一交易日合格股快照尚未发布</p>';
+ render();
+}
+async function query(offset=0,force=false,prefix=''){
+ if(!session||!selectedStage||!$('date').value)return;
+ const task=begin();
+ const args={trade_date:$('date').value,server_id:$('server').value||'local',stage:selectedStage,limit:view==='top'?30:pageSize,offset,qualified_only:view==='qualified'};
+ const key=JSON.stringify(args), cached=viewCache.get(key);
+ resetData();busy=true;$('notice').textContent='正在读取快照…';
+ try{
+  let data;
+  if(!force&&cached&&Date.now()-cached.time<300000){
+   await api('/api/auth/me',{signal:task.signal});
+   data=cached.data;
+  }else{
+   data=await api('/api/auction/view',{body:args,signal:task.signal});
+  }
+  if(!current(task))return;
+  viewCache.set(key,{data,time:data===cached?.data?cached.time:Date.now()});
+  if(viewCache.size>20)viewCache.delete(viewCache.keys().next().value);
+  showResult(data,prefix);
+ }catch(error){
+  if(current(task))$('notice').textContent=(prefix?prefix+' ':'')+(error.name==='TimeoutError'?'读取超时，请刷新重试。':error.message);
+ }finally{if(current(task)){busy=false;render()}}
+}
+async function checkLogin(silent=false){
+ try{
+  session=await api('/api/auth/me',{silent});
+  $('identity').textContent=session.admin?'管理员':'受邀账号';
+  $('manageButton').hidden=session.admin!==true;
+  $('boot').hidden=true;$('authGate').hidden=true;$('appShell').hidden=false;
+  await loadCatalog();
+ }catch(error){if($('authGate').hidden)signOut(error.message)}
+}
+$('loginForm').onsubmit=async event=>{
+ event.preventDefault();$('loginButton').disabled=true;
+ const body={phone:$('phone').value.trim(),password:$('password').value};$('password').value='';
+ try{await api('/api/auth/login',{body});await checkLogin()}
+ catch(error){$('loginState').textContent=error.message}
+ finally{$('loginButton').disabled=false}
+};
+$('logoutButton').onclick=async()=>{
+ try{await api('/api/auth/logout',{body:{}});signOut('已退出登录。')}
+ catch(error){if(session)$('notice').textContent=error.message}
+};
+$('refresh').onclick=()=>{viewCache.clear();return loadCatalog($('server').value,true)};
+$('server').onchange=()=>loadCatalog($('server').value);
+$('date').onchange=()=>{setStage(selectedStage);return query()};
+for(const button of stages)button.onclick=()=>{setStage(button.dataset.stage);return query()};
+for(const button of views)button.onclick=()=>{
+ view=button.dataset.view;
+ for(const item of views)item.setAttribute('aria-pressed',String(item===button));
+ return query();
+};
+$('search').oninput=render;
+$('table').onclick=event=>{
+ const key=event.target.closest('[data-sort]')?.dataset.sort;
+ if(sortable.has(key)){
+  order={key,desc:order?.key===key?!order.desc:true};
+  render();$('table').querySelector('[data-sort="'+key+'"]')?.focus();
+ }
+};
+$('previous').onclick=()=>result&&query(Math.max(0,result.offset-pageSize));
+$('next').onclick=()=>result&&query(result.offset+pageSize);
+$('qualityButton').onclick=()=>$('qualityDialog').showModal();
+const actionNames={disable:'禁用',enable:'启用',reset:'重置密码',revoke:'踢出会话',promote:'设为管理员'};
+async function listAccounts(){
+ const data=await api('/api/auth/accounts');
+ if(!$('accountsDialog').open)return;
+ $('accounts').replaceChildren(...data.accounts.map(account=>{
+  const item=document.createElement('div');item.className='account';
+  const title=document.createElement('p');title.textContent=account.label+' · '+(account.active?'已启用':'已禁用')+' · '+(account.admin?'管理员':'受邀账号');
+  const controls=document.createElement('div');controls.className='segments';
+  const actions=[account.active?'disable':'enable','reset','revoke'];
+  if(session.can_promote&&!account.admin)actions.push('promote');
+  for(const action of actions){
+   const button=document.createElement('button');button.textContent=actionNames[action];
+   button.onclick=()=>{
+    if(confirm('确认对 '+account.label+' 执行'+actionNames[action]+'？'))return manageAccount({action,account_id:account.account_id},account.label);
+   };
+   controls.append(button);
+  }
+  item.append(title,controls);return item;
+ }));
+}
+async function manageAccount(body,label){
+ if(accountBusy)return;
+ accountBusy=true;clearCredential();$('accountStatus').textContent='处理中…';
+ try{
+  const data=await api('/api/auth/accounts',{body});
+  if(!$('accountsDialog').open)return;
+  if(data.password){
+   $('credentialText').textContent='账号 '+(body.phone||label)+' · 密码 '+data.password;
+   $('credential').hidden=false;
+  }
+  $('accountStatus').textContent='操作成功。';
+  await listAccounts();
+ }catch(error){if(session)$('accountStatus').textContent=error.message}
+ finally{accountBusy=false}
+}
+$('manageButton').onclick=async()=>{
+ $('accountsDialog').showModal();$('accountStatus').textContent='正在读取账号…';
+ try{await listAccounts();$('accountStatus').textContent=''}
+ catch(error){if(session)$('accountStatus').textContent=error.message}
+};
+$('createForm').onsubmit=event=>{
+ event.preventDefault();
+ const body={action:'create',phone:$('invitePhone').value.trim(),admin:$('makeAdmin').checked};
+ if($('invitePassword').value)body.password=$('invitePassword').value;
+ return manageAccount(body,body.phone);
+};
+$('copy').onclick=async()=>{
+ try{await navigator.clipboard.writeText($('credentialText').textContent);$('accountStatus').textContent='已复制。'}
+ catch(error){$('accountStatus').textContent='无法自动复制，请选中文字复制。'}
+};
+$('accountsDialog').onclose=()=>{clearCredential();$('createForm').reset();$('accounts').textContent='';$('accountStatus').textContent=''};
+window.addEventListener('pagehide',()=>{$('password').value='';clearCredential();viewCache.clear();active?.abort()});
+checkLogin(true);
+</script>
+</body>
+</html>

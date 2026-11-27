@@ -16,6 +16,7 @@ MAX_BYTES = 8 * 1024 * 1024
 STEMS = {"final": "fixed-0925-v2", "corrected": "fixed-0925-v2-corrected",
          "history": "fixed-0925-v2-history", "0915": "gate-0915",
          "0920": "gate-0920", "0924": "gate-0924"}
+WEB_STAGES = ("final", "0920", "0915")
 
 
 class AuctionQueryError(ValueError):
@@ -24,6 +25,13 @@ class AuctionQueryError(ValueError):
 
 class SnapshotStore(Protocol):
     def read(self, server_id: str, trade_date: str, stage: str) -> tuple[bytes, bytes]: ...
+
+
+def pointer_entries(keys, prefix):
+    pattern = re.compile(re.escape(prefix) + r"([0-9]{8})/(final|0920|0915)/latest\.json")
+    for key in keys:
+        if match := pattern.fullmatch(key):
+            yield match[1], match[2]
 
 
 def _read(path: Path, root: Path) -> bytes:
@@ -42,6 +50,21 @@ def _read(path: Path, root: Path) -> bytes:
 class LocalSnapshotStore:
     def __init__(self, servers: dict[str, Path]):
         self.servers = {key: Path(value).resolve() for key, value in servers.items()}
+
+    def published_entries(self, server_id):
+        from .auction_integrity import select_snapshot_path, validate_final
+        root = self.servers[server_id]
+        for folder in root.iterdir() if root.is_dir() else ():
+            if not re.fullmatch(r"[0-9]{8}", folder.name) or not folder.resolve().is_relative_to(root):
+                continue
+            for stage in WEB_STAGES:
+                path = select_snapshot_path(root, folder.name, STEMS[stage])
+                if path is None or not path.resolve().is_relative_to(root):
+                    continue
+                if not path.with_name(STEMS[stage] + "-all.csv").is_file():
+                    continue
+                if stage != "final" or validate_final(path, day=folder.name)["success"]:
+                    yield folder.name, stage
 
     def read(self, server_id: str, trade_date: str, stage: str) -> tuple[bytes, bytes]:
         root = self.servers[server_id]
@@ -71,10 +94,10 @@ class LocalSnapshotStore:
 
 
 class S3SnapshotStore:
-    """Only GetObject on fixed manifest and immutable content-addressed bundle.
+    """Reads fixed manifests and immutable content-addressed bundles.
 
     Bucket/prefix/client are operator configuration, never tool input.
-    Reader IAM: s3:GetObject only on prefix/*; no Put/List/Delete permissions.
+    Latest-date discovery additionally uses ListBucket on the server prefix.
     """
     def __init__(self, bucket: str, prefix: str = "auction", client=None):
         if not re.fullmatch(r"[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]", bucket):
@@ -94,6 +117,13 @@ class S3SnapshotStore:
                 config=Config(connect_timeout=2, read_timeout=3,
                 retries={"total_max_attempts": 1}))
         self.client = client
+
+    def published_entries(self, server_id):
+        prefix = f"{self.prefix}/{server_id}/"
+        pages = self.client.get_paginator("list_objects_v2").paginate(
+            Bucket=self.bucket, Prefix=prefix, PaginationConfig={"MaxItems": 10000})
+        for page in pages:
+            yield from pointer_entries((entry["Key"] for entry in page.get("Contents", [])), prefix)
 
     def _get(self, key: str, maximum: int) -> bytes:
         try:
@@ -195,6 +225,22 @@ class SupabaseSnapshotStore:
     def __init__(self, *, client=None):
         url, secret, self.bucket, self.prefix = supabase_settings()
         self._storage = client if client is not None else supabase_storage_client(url, secret)
+
+    def published_entries(self, server_id):
+        prefix = f"{self.prefix}/{server_id}/"
+        require_private_supabase_bucket(self._storage, self.bucket)
+        objects = self._storage.from_(self.bucket)
+        options = {"prefix": prefix, "with_delimiter": False, "limit": 500,
+                   "sortBy": {"column": "name", "order": "desc"}}
+        for _ in range(20):
+            page = objects.list_v2(options)
+            yield from pointer_entries((entry.key or entry.name for entry in page.objects), prefix)
+            if not page.hasNext:
+                return
+            if not page.nextCursor or page.nextCursor == options.get("cursor"):
+                break
+            options["cursor"] = page.nextCursor
+        raise AuctionQueryError("SOURCE_UNAVAILABLE: 发布目录超出扫描上限")
 
     def _get(self, key: str, maximum: int) -> bytes:
         try:

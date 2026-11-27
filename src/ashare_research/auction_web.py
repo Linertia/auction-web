@@ -8,6 +8,7 @@ import os
 import threading
 import uuid
 import time
+from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
@@ -19,7 +20,8 @@ from mcp.server.transport_security import TransportSecuritySettings
 
 from .auction_mcp import create_server
 from .auction_query import AuctionRankingReader, AuctionQueryError
-from .auction_snapshot_store import S3SnapshotStore, SupabaseSnapshotStore
+from .auction_monitor import SHANGHAI
+from .auction_snapshot_store import S3SnapshotStore, SupabaseSnapshotStore, WEB_STAGES
 from .auction_web_security import (
     AuditLog, BearerAuth, JWTAuth, MemoryRateLimit, RedisControls, Principal,
     principal_context, audit_event,
@@ -28,6 +30,7 @@ from .contracts.paths import get_paths
 
 request_context = ContextVar("auction_request_id", default="")
 PARAMETERS = {"trade_date", "server_id", "stage", "limit", "offset", "codes", "qualified_only"}
+LATEST_PATH = "/api/auction/latest"
 STATUS = {"UNAUTHORIZED":401, "FORBIDDEN":403, "RATE_LIMITED":429, "QUERY_TIMEOUT":504,
           "QUERY_BUSY":503, "DATA_MISSING":404, "CODE_NOT_FOUND":404, "SNAPSHOT_BUSY":409,
           "AUDIT_UNAVAILABLE":503, "CONTROL_UNAVAILABLE":503, "SOURCE_UNAVAILABLE":503}
@@ -47,6 +50,47 @@ class WebQueryService:
         self.reader, self.audit, self.timeout = reader, audit, timeout
         self.pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="auction-query")
         self.slots = threading.BoundedSemaphore(2)
+
+    async def latest(self, selected):
+        allowed = sorted(set(self.reader.servers) & principal_context.get().servers)
+        if not allowed or (selected is not None and selected not in allowed):
+            raise AuctionQueryError("FORBIDDEN: 无权访问指定服务器")
+        default = "local" if "local" in allowed else allowed[0]
+        server = selected or default
+        if not self.slots.acquire(blocking=False):
+            raise AuctionQueryError("QUERY_BUSY: 查询繁忙，请稍后重试")
+        try:
+            future = self.pool.submit(self.catalog, server)
+        except Exception:
+            self.slots.release()
+            raise
+        future.add_done_callback(lambda _: self.slots.release())
+        try:
+            stages_by_date = await asyncio.wait_for(asyncio.shield(asyncio.wrap_future(future)), self.timeout)
+        except asyncio.TimeoutError:
+            raise AuctionQueryError("QUERY_TIMEOUT: 读取发布目录超时") from None
+        dates = list(stages_by_date)
+        day = dates[0] if dates else None
+        stages = stages_by_date.get(day, [])
+        return {"latest_trade_date": day, "latest_stage": stages[0] if stages else None,
+                "available_stages": stages, "recent_dates": dates, "stages_by_date": stages_by_date,
+                "server_id": server, "default_server_id": default, "server_ids": allowed}
+
+    def catalog(self, server):
+        today = datetime.now(SHANGHAI).date()
+        dates = {}
+        try:
+            for day, stage in self.reader.store.published_entries(server):
+                try:
+                    date = datetime.strptime(day, "%Y%m%d").date()
+                except ValueError:
+                    continue
+                if date <= today and stage in WEB_STAGES:
+                    dates.setdefault(day, set()).add(stage)
+        except Exception:
+            raise AuctionQueryError("SOURCE_UNAVAILABLE: 无法读取快照发布目录") from None
+        return {day: [stage for stage in WEB_STAGES if stage in dates[day]]
+                for day in sorted(dates, reverse=True)[:60]}
 
     async def execute(self, trade_date: str, server_id: str = "local", stage="final",
                       limit: int = 30, offset: int = 0, codes: list[str] | None = None,
@@ -105,7 +149,7 @@ class AccessBoundary:
             return await self.app(scope, receive, send)
         rid = uuid.uuid4().hex
         login_paths = ("/api/auth/login", "/api/auth/logout", "/api/auth/me", "/api/auth/accounts")
-        if path not in ("/api/auction/rank", "/api/auction/view", "/mcp", "/mcp/") and not (
+        if path not in ("/api/auction/rank", "/api/auction/view", LATEST_PATH, "/mcp", "/mcp/") and not (
                 self.sessions and path in login_paths):
             return await error_response("NOT_FOUND",rid,404)(scope,receive,send)
         headers = dict(scope.get("headers",[]))
@@ -192,7 +236,7 @@ class AccessBoundary:
                     (b"cache-control",b"no-store"), (b"x-request-id",rid.encode())]
                 try:
                     # Also reject an in-flight query if another login revoked it.
-                    if session_cookie and path in ("/api/auction/rank", "/api/auction/view", "/api/auth/me"):
+                    if session_cookie and path in ("/api/auction/rank", "/api/auction/view", LATEST_PATH, "/api/auth/me"):
                         await asyncio.to_thread(self.sessions.verify, session_cookie)
                     await asyncio.to_thread(self.audit.emit,audit_event(rid,"http_response",
                         principal.subject, http_status=message["status"]))
@@ -258,7 +302,8 @@ def create_app(reader, auth, *, limiter=None, audit=None, timeout=8.0,
         @app.get("/api/auth/me")
         async def me():
             principal = principal_context.get()
-            return {"authenticated":True, "admin":sessions.is_admin(principal)}
+            return {"authenticated":True, "admin":sessions.is_admin(principal),
+                    "can_promote":principal.subject in sessions.admin_subjects}
 
         @app.post("/api/auth/logout")
         async def logout(request: Request):
@@ -300,6 +345,10 @@ def create_app(reader, auth, *, limiter=None, audit=None, timeout=8.0,
         except (ValueError, TypeError):
             raise AuctionQueryError("PARAMETERS_INVALID: 参数或JSON无效") from None
         return await service.execute(**args)
+
+    @app.get(LATEST_PATH)
+    async def latest(server_id: str | None = None):
+        return await service.latest(server_id)
 
     @app.get("/")
     async def home():
