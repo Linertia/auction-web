@@ -332,6 +332,7 @@ function showPosition(data){
    if(historical||!data.data_healthy)notes.push('当前快照范围内无推荐标的 · 建议空仓观望。');
    else notes.push('当日无推荐标的 · 建议空仓观望。');
    if(weight!=null)notes.push(reason+' · 市场基准仓位 '+number(weight*100,0)+'%。');
+   else if(historical)notes.push('该快照未发布市场仓位参数，请按说明页风控原则人工控制仓位。');
    $('exposure').textContent='0%';
   }else if(weight==null){
    $('exposure').textContent='未发布';
