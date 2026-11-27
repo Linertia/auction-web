@@ -31,6 +31,7 @@ from .contracts.paths import get_paths
 
 request_context = ContextVar("auction_request_id", default="")
 PARAMETERS = {"trade_date", "server_id", "stage", "limit", "offset", "codes", "qualified_only"}
+VIEW_PARAMETERS = PARAMETERS | {"sort_by", "include_previous"}
 LATEST_PATH = "/api/auction/latest"
 
 
@@ -117,11 +118,13 @@ class WebQueryService:
 
     async def execute(self, trade_date: str, server_id: str = "local", stage="final",
                       limit: int = 30, offset: int = 0, codes: list[str] | None = None,
-                      qualified_only: bool = False, *, display: bool = False) -> dict:
+                      qualified_only: bool = False, *, display: bool = False,
+                      include_previous: bool = True, sort_by: str | None = None) -> dict:
         principal = principal_context.get()
         rid = request_context.get() or uuid.uuid4().hex
         args = [trade_date, server_id, stage, limit, offset, codes, qualified_only]
-        digest = hashlib.sha256(json.dumps(args, sort_keys=True).encode()).hexdigest()
+        audit_args = [*args, include_previous, sort_by] if display else args
+        digest = hashlib.sha256(json.dumps(audit_args, sort_keys=True).encode()).hexdigest()
         result, error = None, None
         try:
             if principal is None:
@@ -133,7 +136,8 @@ class WebQueryService:
             try:
                 if display:
                     from .auction_display import read_display
-                    future = self.pool.submit(read_display, self.reader, *args)
+                    future = self.pool.submit(read_display, self.reader, *args,
+                                              include_previous=include_previous, sort_by=sort_by)
                 else:
                     future = self.pool.submit(self.reader.rank_auction_candidates, *args)
             except Exception:
@@ -382,7 +386,7 @@ def create_app(reader, auth, *, limiter=None, audit=None, timeout=8.0,
     async def view(request: Request):
         try:
             args = await request.json()
-            if not isinstance(args,dict) or set(args) - PARAMETERS or "trade_date" not in args:
+            if not isinstance(args,dict) or set(args) - VIEW_PARAMETERS or "trade_date" not in args:
                 raise ValueError()
         except (ValueError, TypeError):
             raise AuctionQueryError("PARAMETERS_INVALID: 参数或JSON无效") from None

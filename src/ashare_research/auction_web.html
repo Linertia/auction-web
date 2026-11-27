@@ -22,6 +22,10 @@ dialog{border:1px solid var(--line);border-radius:10px;width:min(560px,calc(100%
 @media(max-width:700px){.bar,main{padding-left:10px;padding-right:10px}.bar{gap:5px}.brand{flex:1 0 55%;margin:0}.identity{margin-left:0}.kpi,.toolbar{gap:6px 10px}.search{width:100%}.scroll{overflow-x:visible}table{white-space:normal;table-layout:fixed}th,td{padding:5px 3px;font-size:11px;overflow-wrap:anywhere}th:nth-child(1){width:8%}th:nth-child(2){width:14%}th:nth-child(3){width:18%}th:nth-child(8),td:nth-child(8){display:none}.mobileMeta{display:block;color:var(--muted);font-size:10px}}
 dialog[open]{position:fixed;inset:0;margin:auto}
 @media(max-width:700px){th.extra,td.extra{display:none}.mobileMeta small{display:block}}
+.up{color:#b91c1c}.down{color:#15803d}
+.guide{line-height:1.7}.guide article{padding:14px 16px}.guide h2{margin-bottom:6px}.guide ul{margin:4px 0;padding-left:1.4em}
+.book-note{padding:0 12px 8px;overflow-wrap:anywhere}
+@media(max-width:700px){table.book th,table.book td{overflow-wrap:anywhere}table.book th:nth-child(8),table.book td:nth-child(8){display:table-cell}}
 </style>
 </head>
 <body>
@@ -44,20 +48,41 @@ dialog[open]{position:fixed;inset:0;margin:auto}
   </div>
   <button id="refresh">刷新</button><span id="health" class="muted" role="status"></span>
   <span id="identity" class="identity"></span><button id="manageButton" hidden>账号管理</button><button id="logoutButton">退出登录</button>
+  <div class="segments" aria-label="页面视图"><button id="boardNav" aria-pressed="true">行情看板</button><button id="guideNav" aria-pressed="false">策略与操作说明</button></div>
  </div></header>
- <main>
-  <div class="kpi card"><span>快照<strong id="observed">—</strong></span><span>当前榜单<strong id="total">—</strong></span><span>市场仓位参考<strong id="exposure">—</strong></span></div>
+ <main id="board">
+  <div class="kpi card"><span>快照<strong id="observed">—</strong></span><span>当前榜单<strong id="total">—</strong></span><span>建议总仓位<strong id="exposure">—</strong></span></div>
+  <div id="positionAdvice" class="kpi card status" role="status" hidden></div>
   <p id="notice" class="status" role="status"></p>
   <div id="quality" class="kpi card warning" hidden><span id="qualitySummary"></span><button id="qualityButton" hidden>查看缺失明细</button></div>
   <section class="card" aria-label="竞价榜单">
    <div class="toolbar"><div class="segments" aria-label="榜单">
-    <button data-view="top" aria-pressed="true">竞价指数前30</button><button data-view="qualified" aria-pressed="false">基础与历史门通过</button><button data-view="all" aria-pressed="false">排名明细</button>
+    <button data-view="top" aria-pressed="true">竞价指数前30</button><button id="recommendTab" data-view="qualified" aria-pressed="false">当日股票推荐</button><button data-view="all" aria-pressed="false">主板封单排行</button>
    </div><input id="search" class="search" aria-label="筛选当前页" placeholder="筛选当前页代码或名称"></div>
+   <div id="bookControls" class="toolbar" hidden>
+    <div class="segments" aria-label="封单方向"><button data-book="buy" aria-pressed="true">涨停封单（未匹配买）</button><button data-book="sell" aria-pressed="false">跌停封单（未匹配卖）</button></div>
+   </div>
+   <p id="bookNote" class="book-note muted" hidden>按快照未匹配金额排行。公开数据没有逐股核对涨跌停价；较上门变化表示净额差，缺帧或缺个股时显示「—」。</p>
    <div id="table" class="scroll"></div>
    <div class="pagination"><span id="pageInfo" class="muted"></span><button id="previous" disabled>上一页</button><button id="next" disabled>下一页</button></div>
   </section>
   <section class="card prior"><h2 id="historyTitle">昨日 D-1 · 合格个股</h2><div id="history" class="scroll"></div></section>
   <details class="card"><summary>竞价指数 0.5 参考提示</summary><p class="muted">合格股指数低于 0.5 时标橙色。提示供查看，不改变已保存资格。</p></details>
+ </main>
+ <main id="guide" class="guide" hidden>
+  <article class="card"><h2>策略定位与范围</h2><p>竞价反核策略观察沪深主板集合竞价中强分歧转强与弱转强的承接机会。候选规则剔除 ST 及退市风险股，范围限于沪深主板。</p></article>
+  <article class="card"><h2>三帧观察节奏</h2><ul>
+   <li><strong>09:15 门帧</strong>观察隔夜委托和初始封单。此时可以撤单，结果仅供初筛。</li>
+   <li><strong>09:20 门帧</strong>进入不可撤单窗口，关注未匹配买卖额较上一门帧的净变化，并结合盘口判断承接。</li>
+   <li><strong>09:25 冻结</strong>核对撮合结果和当日推荐。冻结发布后无法按已完成的开盘价成交。执行研究需结合 09:24:55 的趋势与开盘后首个可成交价。</li>
+  </ul></article>
+  <article class="card"><h2>指标与颜色预警</h2><ul>
+   <li>竞价指数是承接排序指标。绿色行表示通过快照推荐筛选。推荐股低于 0.5 标橙，D 日候选需复核，D+1 已有持仓优先评估退出或减仓。0.6 至 0.8 为浅红风险提示区。</li>
+   <li>竞价换手 2% 至 3% 标浅红，关注筹码松动。匹配额用于观察流动性与竞价成交支撑。</li>
+   <li>未匹配买卖额反映撮合后的买卖不平衡。封单强度需结合涨跌停价确认，较上门变化反映两帧间净增减。</li>
+  </ul></article>
+  <article class="card"><h2>仓位控制与执行纪律</h2><p>同日多只推荐按等权参考分仓。研究记录以 D 日开盘附近介入、D+1 收盘前结合 0.5 参考线和盘面承接评估退出为节奏，持仓期间避免叠加新机会。</p><p>市场缩量 L1 或小盘连板高度过热 H1 各减半；两者叠加参考 25%。正式冻结无推荐时空仓观望。</p></article>
+  <article class="card"><h2>风险说明</h2><p>冻结和历史重建仅供策略研究与复盘观测。仓位和标的展示不构成实时交易指令、投资建议或成交保证。</p></article>
  </main>
 </div>
 <dialog id="qualityDialog"><div class="dialogHead"><h2>数据不足明细</h2><form method="dialog"><button>关闭</button></form></div><div class="dialogBody"><ul id="qualityRows" class="qualityRows"></ul></div></dialog>
@@ -88,14 +113,25 @@ const historicalSources={
 const columns=[['rank','名次'],['code','代码'],['name','名称'],['score','竞价指数'],['gap_pct','竞价涨幅'],['matched_amount_yuan','匹配额'],['turnover_pct','竞价换手'],['qualified','资格'],['matched_price','撮合价'],['unmatched_buy_amount_yuan','未匹配买'],['unmatched_sell_amount_yuan','未匹配卖']];
 const extraFields=new Set(columns.slice(8).map(([key])=>key));
 const sortable=new Set(['score','gap_pct','matched_amount_yuan','turnover_pct']);
+const bookSorts=new Set(['score','matched_amount_yuan','unmatched_buy_amount_yuan','unmatched_sell_amount_yuan','unmatched_buy_delta_yuan','unmatched_sell_delta_yuan']);
+const marketLabels={normal:'常规',l1_low:'L1 缩量降仓',h1_hot:'H1 高度过热降仓',both:'L1 与 H1 双重降仓'};
 const qualityFields={score:'竞价指数',gap_pct:'竞价涨幅',matched_price:'撮合价',matched_volume_lots:'撮合量',matched_amount_yuan:'撮合金额',turnover_pct:'换手率',unmatched_buy_amount_yuan:'未匹配买额',unmatched_sell_amount_yuan:'未匹配卖额',unmatched_buy_turnover_pct:'未匹配买换手率',unmatched_sell_turnover_pct:'未匹配卖换手率'};
 const errors={FORBIDDEN:'没有操作权限。',RATE_LIMITED:'请求过多，请稍后重试。',DATA_MISSING:'该日期或阶段尚未发布。',SOURCE_UNAVAILABLE:'暂时无法读取快照存储。',QUERY_TIMEOUT:'读取超时，请重试。',ACCOUNT_EXISTS:'该手机号已受邀。',ACCOUNT_LIMIT:'已达到账号数量上限。',PARAMETERS_INVALID:'请检查输入。密码须为 8 位英文字母和数字的组合。',ACCOUNT_MISSING:'账号不存在。',CONTROL_UNAVAILABLE:'会话或限流服务暂不可用。',AUDIT_UNAVAILABLE:'审计服务暂不可用。'};
 let session=null, epoch=0, sequence=0, active=null, selectedStage=null, view='top', catalog=null;
 let result=null, order=null, busy=false, accountBusy=false;
+let bookSide='buy',bookSort='unmatched_buy_amount_yuan',priorKey=null,priorResult=null;
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).filter(part=>part.type!=='literal').map(part=>part.value).join('');
 const pretty=day=>day.replace(/^(....)(..)(..)$/,'$1-$2-$3');
 const number=(value,digits)=>value==null?'—':Number(value).toLocaleString('zh-CN',{maximumFractionDigits:digits,minimumFractionDigits:digits});
+function signedValue(value,text,showPlus=true){
+ if(value==null)return '—';
+ return '<span class="'+(value>0?'up':value<0?'down':'')+'">'+(value>0&&showPlus?'+':'')+text+'</span>';
+}
+function money(value){
+ if(value==null)return '—';
+ return Math.abs(value)>=1e8?number(value/1e8,2)+' 亿':number(value/1e4,0)+' 万';
+}
 const option=(value,label)=>new Option(label,value);
 function showDialog(dialog){
  if(typeof dialog.showModal==='function')dialog.showModal();
@@ -118,16 +154,20 @@ function clearCredential(){
  $('credentialText').textContent='';
  $('invitePassword').value='';
 }
-function resetData(){
+function resetData(clearPrior=true){
  result=null;
- $('table').textContent='';$('history').textContent='';$('historyTitle').textContent='昨日 D-1 · 合格个股';
+ $('table').textContent='';
+ if(clearPrior){$('history').textContent='';$('historyTitle').textContent='昨日 D-1 · 合格个股'}
  for(const id of ['observed','total','exposure'])$(id).textContent='—';
  $('health').textContent='';$('notice').textContent='';$('pageInfo').textContent='';
+ $('positionAdvice').hidden=true;
+ $('recommendTab').textContent='当日股票推荐';
  $('quality').hidden=true;$('qualityRows').textContent='';closeDialog($('qualityDialog'));
  $('previous').disabled=$('next').disabled=true;
 }
 function signOut(message=''){
  epoch++;sequence++;active?.abort();session=null;catalog=null;selectedStage=null;order=null;busy=false;
+ priorKey=priorResult=null;showGuide(false);
  viewCache.clear();resetData();clearCredential();closeDialog($('accountsDialog'));$('accounts').textContent='';
  $('accountStatus').textContent='';$('createForm').reset();$('search').value='';$('date').replaceChildren();$('server').replaceChildren();
  $('password').value='';$('manageButton').hidden=true;$('appShell').hidden=true;$('boot').hidden=true;
@@ -218,10 +258,12 @@ async function loadCatalog(server,keepDate=false){
 }
 function rowCell(row,key){
  const value=row[key];
- if(key.endsWith('_amount_yuan'))return value==null?'—':number(value/10000,0)+' 万';
+ if(key.endsWith('_delta_yuan'))return signedValue(value,money(value));
+ if(key.endsWith('_amount_yuan'))return money(value);
  if(key==='matched_price')return number(value,2);
  if(key==='score')return number(value,3);
- if(key==='gap_pct'||key==='turnover_pct')return value==null?'—':number(value,2)+'%';
+ if(key==='gap_pct')return signedValue(value,number(value,2)+'%');
+ if(key==='turnover_pct')return value==null?'—':number(value,2)+'%';
  if(key==='qualified')return row.qualified?'通过':'—';
  if(key==='name')return esc(value||'—')+(row.qualified?'<span class="mobileMeta">通过</span>':'')
   +'<details class="mobileMeta"><summary>行情</summary>'+columns.slice(8).map(([field,label])=>'<small>'+label+' '+rowCell(row,field)+'</small>').join('')+'</details>';
@@ -229,23 +271,27 @@ function rowCell(row,key){
 }
 function tableHtml(rows,canSort=false){
  if(!rows.length)return '<p class="empty">当前范围没有记录</p>';
- const heading=columns.map(([key,label])=>{
-  const direction=canSort&&order?.key===key?(order.desc?'descending':'ascending'):'none';
-  return canSort&&sortable.has(key)?'<th scope="col" aria-sort="'+direction+'"><button data-sort="'+key+'">'+label+(direction==='none'?' ↕':direction==='descending'?' ↓':' ↑')+'</button></th>':'<th scope="col" class="'+(extraFields.has(key)?'extra':'')+'">'+label+'</th>';
+ const book=canSort&&view==='all';
+ const shown=book?[...columns.slice(0,7),
+  ['unmatched_'+bookSide+'_amount_yuan',bookSide==='buy'?'未匹配买':'未匹配卖'],
+  ['unmatched_'+bookSide+'_delta_yuan','较上门变化']]:columns;
+ const heading=shown.map(([key,label])=>{
+  const direction=book?(bookSort===key?'descending':'none'):canSort&&order?.key===key?(order.desc?'descending':'ascending'):'none';
+  return canSort&&(book?bookSorts:sortable).has(key)?'<th scope="col" aria-sort="'+direction+'"><button data-sort="'+key+'">'+label+(direction==='none'?' ↕':direction==='descending'?' ↓':' ↑')+'</button></th>':'<th scope="col" class="'+(!book&&extraFields.has(key)?'extra':'')+'">'+label+'</th>';
  }).join('');
- const body=rows.map(row=>'<tr class="'+(row.qualified?'qualified':'')+'">'+columns.map(([key])=>{
+ const body=rows.map(row=>'<tr class="'+(row.qualified?'qualified':'')+'">'+shown.map(([key])=>{
   const value=row[key];
   const risk=(key==='score'&&value>=.6&&value<=.8)||(key==='turnover_pct'&&value>=2&&value<=3);
   const low=key==='score'&&row.qualified&&value!=null&&value<.5;
-  return '<td class="'+(extraFields.has(key)?'extra ':'')+(risk?'risk':low?'low':'')+'">'+rowCell(row,key)+'</td>';
+  return '<td class="'+(!book&&extraFields.has(key)?'extra ':'')+(risk?'risk':low?'low':'')+'">'+rowCell(row,key)+'</td>';
  }).join('')+'</tr>').join('');
- return '<table><thead><tr>'+heading+'</tr></thead><tbody>'+body+'</tbody></table>';
+ return '<table'+(book?' class="book"':'')+'><thead><tr>'+heading+'</tr></thead><tbody>'+body+'</tbody></table>';
 }
 function render(){
  if(!result)return;
  const needle=$('search').value.trim().toLowerCase();
  const rows=result.rows.filter(row=>String(row.code).includes(needle)||String(row.name??'').toLowerCase().includes(needle));
- if(order)rows.sort((a,b)=>(order.desc?-1:1)*(a[order.key]-b[order.key])||a.rank-b.rank);
+ if(order&&view!=='all')rows.sort((a,b)=>(order.desc?-1:1)*(a[order.key]-b[order.key])||a.rank-b.rank);
  $('table').innerHTML=tableHtml(rows,true);
  $('pageInfo').textContent=result.rows.length?(result.offset+1)+'–'+(result.offset+result.rows.length)+' / '+result.total+(needle?' · 筛中 '+rows.length+' 条':''):'0 / '+result.total;
  $('previous').disabled=busy||view==='top'||result.offset===0;
@@ -254,6 +300,7 @@ function render(){
 function showDataQuality(data){
  const q=data.data_quality,p=data.provenance;
  const notes=[];
+ if(data.display?.frame_coverage!=null)notes.push('门帧采集覆盖 '+number(data.display.frame_coverage*100,1)+'%。');
  if(q?.excluded_row_count)notes.push(q.excluded_row_count+' 只数据不足，未参与排名与候选判断；前30只覆盖有效数据。');
  if(q?.unranked_observation_count)notes.push(q.unranked_observation_count+' 只未排名观察记录。');
  if(p?.excluded_row_count)notes.push('来源另有 '+p.excluded_row_count+' 条缺失记录。');
@@ -268,16 +315,46 @@ function showDataQuality(data){
   return item;
  }));
 }
+function showPosition(data){
+ const summary=data.recommendation_summary;
+ const weight=data.display?.exposure_weight;
+ const reason=marketLabels[data.display?.market_state]||'市场档位未发布';
+ const review=data.display?.market_timing==='review_after_auction_started';
+ const historical=data.stage==='history'||selectedStage==='history';
+ $('recommendTab').textContent='当日股票推荐'+(summary?' ('+summary.total+')':'');
+ $('exposure').textContent='—';
+ const notes=[];
+ if(!summary)notes.push('推荐与仓位建议待 09:25 冻结。');
+ else{
+  if(historical)notes.push('历史重建 · 仓位仅供复盘。');
+  if(review)notes.push('市场状态为竞价后补算，仅供复盘。');
+  if(summary.total===0){
+   if(historical||!data.data_healthy)notes.push('当前快照范围内无推荐标的 · 建议空仓观望。');
+   else notes.push('当日无推荐标的 · 建议空仓观望。');
+   if(weight!=null)notes.push(reason+' · 市场基准仓位 '+number(weight*100,0)+'%。');
+   $('exposure').textContent='0%';
+  }else if(weight==null){
+   $('exposure').textContent='未发布';
+   notes.push('该快照未发布市场仓位参数，请按说明页风控原则人工控制仓位。');
+  }else{
+   $('exposure').textContent=number(weight*100,0)+'%';
+   notes.push(reason+' · 单票等权仓位参考 '+number(weight*100/summary.total,1)+'%。');
+  }
+  if(summary.low_score)notes.push('含低承接预警标的，建议人工复核后再决定是否参与。');
+ }
+ $('positionAdvice').textContent=notes.join(' ');
+ $('positionAdvice').hidden=false;
+}
 function showResult(data,prefix){
  result=data;
  const historical=selectedStage==='history';
  $('health').textContent=historical?'历史重建':data.data_quality?.excluded_row_count?'部分可用':data.data_healthy?'健康':'数据异常';
  $('observed').textContent=data.observed_at?.slice(11,19)||'—';
  $('total').textContent=data.total.toLocaleString();
- $('exposure').textContent=data.display?.exposure_weight==null?'未发布':number(data.display.exposure_weight*100,0)+'%';
+ showPosition(data);
  $('notice').textContent=[prefix,historical?'09:25 历史重建。'+(historicalSources[data.provenance?.kind]??'请按历史重建范围解读。'):''].filter(Boolean).join(' ');
  showDataQuality(data);
- const prior=data.previous_qualified;
+ const prior=priorResult;
  $('historyTitle').textContent='昨日 D-1 · 合格个股'+(prior?.trade_date?' · '+pretty(prior.trade_date):'');
  $('history').innerHTML=prior?.status==='published'
   ?'<div class="kpi">'+esc(labels[prior.stage]||prior.stage)+' · '+esc(prior.total)+' 只'+(prior.total>prior.rows.length?' · 展示前 '+esc(prior.rows.length)+' 条':'')+'</div>'+tableHtml(prior.rows)
@@ -288,17 +365,21 @@ async function query(offset=0,force=false,prefix=''){
  if(!session||!selectedStage||!$('date').value)return;
  const task=begin();
  const args={trade_date:$('date').value,server_id:$('server').value||'local',stage:selectedStage,limit:view==='top'?30:pageSize,offset,qualified_only:view==='qualified'};
+ if(view==='all')args.sort_by=bookSort;
+ const dayKey=args.server_id+'/'+args.trade_date;
+ const sameDay=priorKey===dayKey;
  const key=JSON.stringify(args), cached=viewCache.get(key);
- resetData();busy=true;$('notice').textContent='正在读取快照…';
+ resetData(!sameDay);busy=true;$('notice').textContent='正在读取快照…';
  try{
   let data;
-  if(!force&&cached&&Date.now()-cached.time<300000){
+  if(!force&&sameDay&&cached&&Date.now()-cached.time<300000){
    await api('/api/auth/me',{signal:task.signal});
    data=cached.data;
   }else{
-   data=await api('/api/auction/view',{body:args,signal:task.signal});
+   data=await api('/api/auction/view',{body:{...args,include_previous:!sameDay},signal:task.signal});
   }
   if(!current(task))return;
+  if(!sameDay){priorKey=dayKey;priorResult=data.previous_qualified??null}
   viewCache.set(key,{data,time:data===cached?.data?cached.time:Date.now()});
   if(viewCache.size>20)viewCache.delete(viewCache.keys().next().value);
   showResult(data,prefix);
@@ -327,17 +408,35 @@ $('logoutButton').onclick=async()=>{
  catch(error){if(session)$('notice').textContent=error.message}
 };
 $('refresh').onclick=()=>{viewCache.clear();return loadCatalog($('server').value,true)};
+function showGuide(show){
+ $('guide').hidden=!show;$('board').hidden=show;
+ $('guideNav').setAttribute('aria-pressed',String(show));
+ $('boardNav').setAttribute('aria-pressed',String(!show));
+}
+$('guideNav').onclick=()=>showGuide(true);
+$('boardNav').onclick=()=>showGuide(false);
 $('server').onchange=()=>loadCatalog($('server').value);
 $('date').onchange=()=>{setStage(selectedStage);return query()};
 for(const button of stages)button.onclick=()=>{setStage(button.dataset.stage);return query()};
 for(const button of views)button.onclick=()=>{
  view=button.dataset.view;
  for(const item of views)item.setAttribute('aria-pressed',String(item===button));
+ $('bookControls').hidden=$('bookNote').hidden=view!=='all';
+ return query();
+};
+for(const button of document.querySelectorAll('[data-book]'))button.onclick=()=>{
+ bookSide=button.dataset.book;
+ bookSort='unmatched_'+bookSide+'_amount_yuan';
+ for(const item of document.querySelectorAll('[data-book]'))item.setAttribute('aria-pressed',String(item===button));
  return query();
 };
 $('search').oninput=render;
 $('table').onclick=event=>{
  const key=event.target.closest('[data-sort]')?.dataset.sort;
+ if(view==='all'&&bookSorts.has(key)){
+  bookSort=key;
+  return query();
+ }
  if(sortable.has(key)){
   order={key,desc:order?.key===key?!order.desc:true};
   render();$('table').querySelector('[data-sort="'+key+'"]')?.focus();

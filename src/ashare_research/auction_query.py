@@ -87,6 +87,10 @@ class AuctionRankingReader:
         limit: int = 30, offset: int = 0, codes: list[str] | None = None,
         qualified_only: bool = False,
     ) -> dict:
+        return self._query(trade_date, server_id, stage, limit, offset, codes, qualified_only)
+
+    def _query(self, trade_date, server_id="local", stage="final", limit=30, offset=0, codes=None,
+               qualified_only=False, *, display_query=False, sort_by=None):
         if not isinstance(trade_date, str) or not re.fullmatch(r"[0-9]{8}", trade_date):
             raise AuctionQueryError("DATE_INVALID: 日期必须是YYYYMMDD")
         try:
@@ -108,29 +112,58 @@ class AuctionRankingReader:
         if codes is not None and (not isinstance(codes, list) or len(codes) > 100 or
             any(not isinstance(code, str) or not re.fullmatch(r"[0-9]{6}", code) for code in codes)):
             raise AuctionQueryError("CODE_INVALID: 最多100个六位数字股票代码")
+        meta, ranked, display = self._snapshot(server_id, trade_date, stage)
+        wanted = set(codes or [])
+        if wanted and wanted - {row["code"] for row in ranked}:
+            raise AuctionQueryError("CODE_NOT_FOUND: 指定代码在该快照中没有有效数据")
+        rows = [row for row in ranked if (not wanted or row["code"] in wanted)
+                and (not qualified_only or row["qualified"])]
+        summary = None
+        if display_query:
+            if stage in ("final", "history", "corrected"):
+                qualified = [row for row in ranked if row["qualified"]]
+                summary = {"total": len(qualified), "low_score": any(row["score"] < .5 for row in qualified)}
+            if sort_by is not None:
+                rows = self._book_rows(rows, server_id, trade_date, stage, sort_by)
+        result = {**meta, "server_id": server_id, "trade_date": trade_date,
+                  "stage": stage, "total": len(rows), "offset": offset,
+                  "limit": limit, "rows": [dict(row) for row in rows[offset:offset + limit]]}
+        return (result, display, summary) if display_query else result
+
+    def _snapshot(self, server_id, trade_date, stage):
+        ttl = 300 if stage in ("0915", "0920", "final", "history") else 1
         with self._lock:
-            root = self.servers[server_id]
             key = (server_id, trade_date, stage)
             cached = self._cache.get(key)
-            if cached and time.monotonic() - cached[0] < 1.0:
-                meta, ranked = cached[1:]
-            else:
-                meta, ranked = self._load(root, trade_date, stage, server_id)
-                self._cache[key] = (time.monotonic(), meta, ranked)
-                self._cache.move_to_end(key)
-                while len(self._cache) > 8:
-                    self._cache.popitem(last=False)
-            wanted = set(codes or [])
-            available = {row["code"] for row in ranked}
-            if wanted - available:
-                raise AuctionQueryError("CODE_NOT_FOUND: 指定代码在该快照中没有有效数据")
-            rows = [row for row in ranked if (not wanted or row["code"] in wanted)
-                    and (not qualified_only or row["qualified"])]
-            return {**meta, "server_id": server_id, "trade_date": trade_date,
-                    "stage": stage, "total": len(rows), "offset": offset,
-                    "limit": limit, "rows": [dict(row) for row in rows[offset:offset + limit]]}
+            if not cached or time.monotonic() - cached[0] >= ttl:
+                snapshot = self._load(self.servers[server_id], trade_date, stage, server_id)
+                self._cache[key] = cached = (time.monotonic(), *snapshot)
+            self._cache.move_to_end(key)
+            while len(self._cache) > 8:
+                self._cache.popitem(last=False)
+            return cached[1:]
 
-    def _load(self, root: Path, trade_date: str, stage: Stage, server_id: str) -> tuple[dict, list[dict]]:
+    def _book_rows(self, rows, server_id, trade_date, stage, sort_by):
+        previous = {}
+        previous_stage = {"0920": "0915", "final": "0920"}.get(stage)
+        if previous_stage:
+            try:
+                _, prior_rows, _ = self._snapshot(server_id, trade_date, previous_stage)
+                previous = {row["code"]: row for row in prior_rows}
+            except AuctionQueryError as exc:
+                if str(exc).split(":", 1)[0] != "DATA_MISSING":
+                    raise
+        enriched = []
+        for row in rows:
+            prior = previous.get(row["code"])
+            enriched.append({**row,
+                **{f"unmatched_{side}_delta_yuan": (
+                    row[f"unmatched_{side}_amount_yuan"] - prior[f"unmatched_{side}_amount_yuan"]
+                    if prior is not None else None) for side in ("buy", "sell")}})
+        return sorted(enriched, key=lambda row: (
+            row[sort_by] is None, -(row[sort_by] or 0), row["rank"], row["code"]))
+
+    def _load(self, root: Path, trade_date: str, stage: Stage, server_id: str) -> tuple[dict, list[dict], object]:
         try:
             raw_meta, raw_rows = self.store.read(server_id, trade_date, stage)
             meta = json.loads(raw_meta)
@@ -211,13 +244,14 @@ class AuctionRankingReader:
             digest = hashlib.sha256(raw_meta + raw_rows).hexdigest()
             return ({"observed_at": observed.isoformat(), "data_healthy": meta["data_healthy"] and not excluded,
                      **quality,
-                     "source_sha256": digest, "cached_seconds_max": 1,
+                     "source_sha256": digest,
+                     "cached_seconds_max": 300 if stage in ("0915", "0920", "final", "history") else 1,
                      "interpretation": (("historical_gate_conditioned_result" if provenance['kind'] == 'historical_gate_backfill_v2'
                                          else "historical_archive_final_result") if provenance else "published_monitor_result"),
                      "sampling_scope": (provenance["sampling_scope"] if provenance
                                         else "published_monitor_scope"),
                      **({"provenance": provenance} if provenance else {})},
-                    [public[row.code] for row in ranked])
+                    [public[row.code] for row in ranked], meta.get("display"))
         except AuctionQueryError:
             raise
         except (OSError, ValueError, TypeError, KeyError, csv.Error):

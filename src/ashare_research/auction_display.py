@@ -1,18 +1,33 @@
 """Allowlisted display metadata; never computes strategy or personal positions."""
-import hashlib
-import json
+import math
 import re
 from datetime import datetime
 
 from .auction_query import AuctionQueryError
 
+SORT_FIELDS = frozenset({
+    "score", "matched_amount_yuan", "unmatched_buy_amount_yuan", "unmatched_sell_amount_yuan",
+    "unmatched_buy_delta_yuan", "unmatched_sell_delta_yuan",
+})
+MARKET_STATE_WEIGHTS = {"normal": 1, "l1_low": .5, "h1_hot": .5, "both": .25}
+
 
 def validate_display(value):
-    if not isinstance(value, dict) or not {"exposure_weight", "prior_trade_date"} <= set(value) or set(value) - {"exposure_weight", "prior_trade_date", "stock_names"}:
+    if not isinstance(value, dict) or not {"exposure_weight", "prior_trade_date"} <= set(value) or set(value) - {"exposure_weight", "prior_trade_date", "stock_names", "market_state", "market_timing", "frame_coverage"}:
         raise AuctionQueryError("DATA_INVALID: 展示元数据无效")
     weight, prior = value["exposure_weight"], value["prior_trade_date"]
     if weight is not None and (type(weight) not in (int, float) or weight not in (.25, .5, 1)):
         raise AuctionQueryError("DATA_INVALID: 市场仓位结果无效")
+    if "market_state" in value and (
+        not isinstance(value["market_state"], str) or value["market_state"] not in MARKET_STATE_WEIGHTS
+        or MARKET_STATE_WEIGHTS[value["market_state"]] != weight
+    ):
+        raise AuctionQueryError("DATA_INVALID: 市场档位与仓位不一致")
+    if "market_timing" in value and value["market_timing"] not in ("pre_auction", "review_after_auction_started"):
+        raise AuctionQueryError("DATA_INVALID: 市场状态时点无效")
+    coverage = value.get("frame_coverage", 1)
+    if type(coverage) not in (int, float) or not math.isfinite(coverage) or not 0 <= coverage <= 1:
+        raise AuctionQueryError("DATA_INVALID: 门帧覆盖率无效")
     if prior is not None:
         if not isinstance(prior, str) or len(prior) != 8 or not prior.isdigit():
             raise AuctionQueryError("DATA_INVALID: 上一交易日无效")
@@ -29,40 +44,44 @@ def validate_display(value):
     return dict(value)
 
 
-def _display_rows(reader, result, display=None):
-    if display is None:
-        meta, rows = reader.store.read(result["server_id"], result["trade_date"], result["stage"])
-        if hashlib.sha256(meta + rows).hexdigest() != result["source_sha256"]:
-            raise AuctionQueryError("SNAPSHOT_BUSY: 名称与排名快照不一致")
-        display = validate_display(json.loads(meta).get("display", {
-            "exposure_weight": None, "prior_trade_date": None}))
+def _display_rows(result, display):
     names = display.get("stock_names", {})
     return [{**row, **({"name": names[row["code"]]} if row["code"] in names else {})}
             for row in result["rows"]]
 
 
-def read_display(reader, *args):
-    result = reader.rank_auction_candidates(*args)
-    server, day, stage = result["server_id"], result["trade_date"], result["stage"]
-    raw_meta, raw_rows = reader.store.read(server, day, stage)
-    if hashlib.sha256(raw_meta + raw_rows).hexdigest() != result["source_sha256"]:
-        raise AuctionQueryError("SNAPSHOT_BUSY: 展示与排名快照不一致")
-    display = validate_display(json.loads(raw_meta).get("display", {
-        "exposure_weight":None, "prior_trade_date":None}))
+def _validated_display(value):
+    return validate_display(value if value is not None else {
+        "exposure_weight": None, "prior_trade_date": None})
+
+
+def read_display(reader, *args, include_previous=True, sort_by=None):
+    if type(include_previous) is not bool or (
+        sort_by is not None and (not isinstance(sort_by, str) or sort_by not in SORT_FIELDS)
+    ):
+        raise AuctionQueryError("PARAMETERS_INVALID: 展示排序或昨日报表参数无效")
+    result, display, summary = reader._query(*args, display_query=True, sort_by=sort_by)
+    server, day = result["server_id"], result["trade_date"]
+    display = _validated_display(display)
     prior = display["prior_trade_date"]
+    if prior and prior >= day:
+        raise AuctionQueryError("DATE_MISMATCH: 上一交易日必须早于查询日")
+    output = {**result, "rows": _display_rows(result, display), "display": display,
+              "recommendation_summary": summary}
+    if not include_previous:
+        return output
     previous = {"status":"not_published", "trade_date":prior, "rows":[], "total":None}
     if prior:
-        if prior >= day:
-            raise AuctionQueryError("DATE_MISMATCH: 上一交易日必须早于查询日")
         # Never infer D-1 by subtracting a calendar day, or substitute another frame.
-        for prior_stage in ("corrected", "final"):
+        for prior_stage in ("corrected", "final", "history"):
             try:
-                data = reader.rank_auction_candidates(prior,server,prior_stage,100,0,None,True)
+                data, prior_display, _ = reader._query(
+                    prior, server, prior_stage, 100, 0, None, True, display_query=True)
                 previous = {"status":"published", "trade_date":prior, "stage":prior_stage,
-                            "rows":_display_rows(reader, data), "total":data["total"],
+                            "rows":_display_rows(data, _validated_display(prior_display)), "total":data["total"],
                             "data_healthy":data["data_healthy"], "source_sha256":data["source_sha256"]}
                 break
             except AuctionQueryError as exc:
                 if str(exc).split(":",1)[0] != "DATA_MISSING":
                     raise
-    return {**result, "rows":_display_rows(reader, result, display), "display":display, "previous_qualified":previous}
+    return {**output, "previous_qualified": previous}
