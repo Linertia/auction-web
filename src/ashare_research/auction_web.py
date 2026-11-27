@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Request
 from starlette.responses import HTMLResponse, JSONResponse
@@ -31,6 +32,28 @@ from .contracts.paths import get_paths
 request_context = ContextVar("auction_request_id", default="")
 PARAMETERS = {"trade_date", "server_id", "stage", "limit", "offset", "codes", "qualified_only"}
 LATEST_PATH = "/api/auction/latest"
+
+
+def web_origins(public_url, extra_json="[]"):
+    """Allow exact operator-specified HTTPS origins for the website session."""
+    try:
+        extra = json.loads(extra_json)
+        if not isinstance(extra, list) or len(extra) > 8:
+            raise ValueError()
+        for item in extra:
+            if not isinstance(item, str):
+                raise ValueError()
+            parsed = urlsplit(item)
+            if (parsed.scheme != "https" or not parsed.hostname or parsed.username
+                    or parsed.password or parsed.port is not None
+                    or item != "https://" + parsed.hostname
+                    or not all(part and part.isascii() and part.replace("-", "").isalnum()
+                               for part in parsed.hostname.split("."))):
+                raise ValueError()
+    except (ValueError, TypeError):
+        raise ValueError("CONFIG_INVALID: 网站备用域名必须为明确的HTTPS来源") from None
+    primary = (public_url,) if public_url else ("http://127.0.0.1:8790", "http://localhost:8790")
+    return tuple(dict.fromkeys((*primary, *extra)))
 STATUS = {"UNAUTHORIZED":401, "FORBIDDEN":403, "RATE_LIMITED":429, "QUERY_TIMEOUT":504,
           "QUERY_BUSY":503, "DATA_MISSING":404, "CODE_NOT_FOUND":404, "SNAPSHOT_BUSY":409,
           "AUDIT_UNAVAILABLE":503, "CONTROL_UNAVAILABLE":503, "SOURCE_UNAVAILABLE":503}
@@ -258,7 +281,6 @@ def create_app(reader, auth, *, limiter=None, audit=None, timeout=8.0,
     service = WebQueryService(reader,audit,timeout)
     hosts = ["127.0.0.1:*", "localhost:*"]
     if public_url:
-        from urllib.parse import urlsplit
         hosts.append(urlsplit(public_url).netloc)
     mcp = create_server(reader,None,executor=service.execute,stateless_http=True,json_response=True,
         transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=True,
@@ -411,7 +433,7 @@ def app_from_env():
         redis=RedisControls(os.environ["KV_REST_API_URL"],os.environ["KV_REST_API_TOKEN"])
     if cloud and redis is None:
         raise ValueError("CONFIG_INVALID: Vercel需要分布式限流与审计")
-    origins=(public_url,) if public_url else ("http://127.0.0.1:8790","http://localhost:8790")
+    origins=web_origins(public_url, os.environ.get("AUCTION_WEB_EXTRA_ORIGINS_JSON", "[]"))
     sessions = None
     if os.environ.get("AUCTION_LOGIN_ENABLED") == "1":
         from .auction_login import InvitationSessions
