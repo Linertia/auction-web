@@ -26,6 +26,16 @@ function reset(){result=null;loadedArgs=null;offset=0;$('table').innerHTML=signe
 function selectStage(stage){$('stage').value=stage;document.querySelectorAll('[data-stage]').forEach(b=>b.classList.toggle('active',b.dataset.stage===stage));reset();return query()}
 const errors={UNAUTHORIZED:'凭证无效或已过期，请重新输入。',FORBIDDEN:'无权读取此服务器或请求来源。',DATA_MISSING:'该日期或阶段尚未发布。',RATE_LIMITED:'请求频繁，请稍后重试。',AUDIT_UNAVAILABLE:'审计暂不可用，已安全拒绝返回数据。',CONTROL_UNAVAILABLE:'限流暂不可用，已安全拒绝返回数据。',QUERY_TIMEOUT:'查询超时，请稍后重试。',DATE_INVALID:'日期无效或为未来日期。'};
 function showResult(data,args){result=data;loadedArgs=args;offset=data.offset;const gated=data.interpretation==='historical_gate_conditioned_result',historical=gated||data.interpretation==='historical_archive_final_result',p=data.provenance||{};$('health').textContent=data.data_healthy?'健康':'异常';$('stageLabel').textContent=labels[args.stage];$('time').textContent='快照时间 '+data.observed_at.slice(11,19);$('total').textContent=data.total.toLocaleString();$('scope').textContent=historical?(gated?'09:20门通过池（非全市场）':(p.kind==='historical_capture_final_v2'?'已捕获主板观测（非全市场）':'主板归档范围（含缺失）')):(view==='qualified'?'保存资格通过的记录':'全部有效记录');document.querySelector('[data-view="all"]').textContent=historical?(gated?'门控池明细':'归档明细'):'全市场明细';$('exposure').textContent=data.display?.exposure_weight==null?'未发布':number(data.display.exposure_weight*100,0)+'%';$('fingerprint').textContent='来源 SHA-256 '+data.source_sha256.slice(0,16)+'…';$('fingerprint').title=data.source_sha256;const previous=data.previous_qualified;$('historyTitle').textContent='昨日 D-1 · '+(previous?.trade_date||'交易日未发布')+' · 合格个股';$('history').innerHTML=previous?.status==='published'?'<div class="notice">'+esc(previous.stage)+' · 共 '+previous.total+' 只 · '+(previous.data_healthy?'保存时健康':'保存时异常')+(previous.total>previous.rows.length?' · 展示前 '+previous.rows.length+' 条':'')+'</div>'+tableHtml(previous.rows,previous.stage):'<div class="empty">上一交易日或对应云端快照未发布，不用自然日减一天替代。</div>';const rowWarning=p.excluded_row_count?'；来源 '+p.source_row_count+' 条，发布 '+p.published_row_count+' 条，因点时字段缺失排除 '+p.excluded_row_count+' 条。':'。';const historicalWarning=historical?(gated?'历史银河门控补测，仅含09:20金额门通过池，不是全市场排名；流通股本来源日 ':(p.kind==='historical_capture_final_v2'?'本机原始推送09:25重建，仅已捕获观测范围，非全市场；流通股本来源日 ':'主板归档09:25历史重建，不是当年实时冻结，缺失证券未补造；流通股本来源日 '))+esc(p.free_share_source_date||'未发布')+(p.free_share_exact_date?'（当日）':'（非当日）')+rowWarning+(p.event_risk_complete?'':'重大利空公告覆盖未完成。'):'';$('notice').textContent=args.trade_date+' · 已读取服务器真实快照 · '+(data.data_healthy?'保存时健康':'保存时异常，请勿当作有效确认')+'。'+historicalWarning+(['0915','0920'].includes(args.stage)?'本阶段隐藏排除原因。':'排除原因未发布。');$('notice').className=data.data_healthy?'notice':'notice error';render()}
+function showDataQuality(data){
+ const q=data.data_quality;if(!q?.excluded_row_count)return;
+ $('health').textContent='部分可用';
+ $('scope').textContent+=' · 仅有效数据排名';
+ const fields={score:'竞价指数',gap_pct:'竞价涨幅',matched_price:'撮合价',matched_volume_lots:'撮合量',matched_amount_yuan:'撮合金额',turnover_pct:'换手率',unmatched_buy_amount_yuan:'未匹配买额',unmatched_sell_amount_yuan:'未匹配卖额',unmatched_buy_turnover_pct:'未匹配买换手率',unmatched_sell_turnover_pct:'未匹配卖换手率'};
+ const message='已读取 '+q.source_row_count+' 只，可排名 '+q.valid_row_count+' 只；'+q.excluded_row_count+' 只数据不足，已隔离且不参与排名和候选判断。'+(q.unranked_observation_count?'另有 '+q.unranked_observation_count+' 只原快照未纳入排名的观察记录，仍不参与策略榜单。':'')+'排名仅覆盖有效数据，不能保证全市场前30。';
+ const prior=$('notice').textContent.replace('保存时异常，请勿当作有效确认',q.source_data_healthy?'原快照标记健康，查询发现部分字段缺失':'原快照标记异常');
+ $('notice').innerHTML=esc(prior)+'<br>'+esc(message)+'<details><summary>查看数据不足个股及缺失字段</summary>'+q.excluded_rows.map(r=>esc(r.code)+' · '+esc(data.display?.stock_names?.[r.code]||'')+' · 数据不足：'+r.fields.map(f=>esc(fields[f]||f)).join('、')).join('<br>')+'</details>';
+ $('notice').className='notice';
+}
 function invalidateSession(){signedIn=false;sessionEpoch++;requestSerial++;activeController?.abort();viewCache.clear();busy=false;reset();$('logoutButton').hidden=true}
 async function query(pageOffset=0,force=false){
  if(!signedIn){$('notice').className='notice error';$('notice').textContent='请先使用受邀账号登录。';$('phone').focus();return}
@@ -54,6 +64,7 @@ async function query(pageOffset=0,force=false){
   if(serial!==requestSerial||epoch!==sessionEpoch)return;
   viewCache.set(key,{data,savedAt:cached&&data===cached.data?cached.savedAt:Date.now()});if(viewCache.size>20)viewCache.delete(viewCache.keys().next().value);
   showResult(data,args);
+  showDataQuality(data);
  }catch(error){
   if((serial!==requestSerial||epoch!==sessionEpoch)&&signedIn)return;
   if(serial!==requestSerial&&error.name==='AbortError')return;

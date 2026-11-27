@@ -144,26 +144,51 @@ class AuctionRankingReader:
                 raise AuctionQueryError("DATE_MISMATCH: 快照日期与查询日期不一致")
             if type(meta.get("data_healthy")) is not bool:
                 raise AuctionQueryError("DATA_INVALID: 快照缺少数据健康状态")
-            features, public = [], {}
+            features, public, excluded, seen, source_ranks = [], {}, [], set(), []
+            unranked_count = 0
             reader = csv.DictReader(io.StringIO(raw_rows.decode("utf-8-sig")))
             for index, row in enumerate(reader):
                 if index >= MAX_ROWS:
                     raise AuctionQueryError("SOURCE_TOO_LARGE: 快照超过10000行")
                 code = row["code"]
-                if not re.fullmatch(r"[0-9]{6}", code) or code in public:
+                if not re.fullmatch(r"[0-9]{6}", code) or code in seen:
                     raise AuctionQueryError("DATA_INVALID: 股票代码无效或重复")
+                seen.add(code)
                 if datetime.fromisoformat(row["observed_at"]).astimezone(SHANGHAI).strftime("%Y%m%d") != trade_date:
                     raise AuctionQueryError("DATE_MISMATCH: 明细日期不匹配")
                 if row["cycle_id"] != cycle_id:
                     raise AuctionQueryError("SNAPSHOT_BUSY: 快照和明细的采集批次不一致")
-                numbers = {field: float(row[field]) for field in PUBLIC_NUMBERS}
-                if not all(math.isfinite(value) for value in numbers.values()):
-                    raise AuctionQueryError("DATA_INVALID: 必需竞价特征缺失或非有限数")
                 if row["qualified"] not in ("True", "False"):
                     raise AuctionQueryError("DATA_INVALID: qualified字段无效")
+                source_rank = int(row['rank'])
+                if source_rank < 0 or (source_rank == 0 and row['qualified'] == 'True'):
+                    raise AuctionQueryError('RANK_MISMATCH: 未排名记录不能标记为候选')
+                if source_rank:
+                    source_ranks.append(source_rank)
+                numbers, invalid = {}, []
+                for field in PUBLIC_NUMBERS:
+                    try:
+                        value = float(row[field])
+                    except (TypeError, ValueError):
+                        invalid.append(field)
+                        continue
+                    if not math.isfinite(value):
+                        invalid.append(field)
+                    else:
+                        numbers[field] = value
+                if invalid:
+                    # Isolate only numeric incompleteness; identity/date/rank and
+                    # publication integrity remain whole-snapshot requirements.
+                    excluded.append({'code': code, 'reason': 'DATA_INSUFFICIENT', 'fields': invalid})
+                    continue
+                if source_rank == 0:
+                    # The producer explicitly marks observation-only records as
+                    # unranked. Never expand the strategy universe in a reader.
+                    unranked_count += 1
+                    continue
                 feature = AuctionFeature(
                     cycle_id="", observed_at="", source_time="", code=code, name="",
-                    rank=int(row["rank"]), float_shares=0, float_share_source="", **numbers,
+                    rank=source_rank, float_shares=0, float_share_source="", **numbers,
                 )
                 features.append(feature)
                 # Only public market numbers; no account, holding, paths or arbitrary text.
@@ -172,11 +197,20 @@ class AuctionRankingReader:
             if not features:
                 raise AuctionQueryError("DATA_EMPTY: 快照没有有效竞价明细")
             ranked = rank_auction_features(features)
-            if any(row.rank != index for index, row in enumerate(ranked, 1)):
+            if (sorted(source_ranks) != list(range(1, len(source_ranks) + 1))
+                or [row.rank for row in ranked] != sorted(row.rank for row in features)):
                 raise AuctionQueryError("RANK_MISMATCH: 保存排名与现有排序入口不一致")
+            quality = ({'data_quality': {
+                'status': 'partial' if excluded else 'complete', 'source_data_healthy': meta['data_healthy'],
+                'source_row_count': len(seen), 'valid_row_count': len(features),
+                'unranked_observation_count': unranked_count,
+                'excluded_row_count': len(excluded), 'excluded_rows': excluded,
+                'ranking_scope': 'valid_rows_only', 'full_market_top30_confirmed': False,
+            }} if excluded or unranked_count else {})
             provenance = validate_provenance(meta.get("provenance"))
             digest = hashlib.sha256(raw_meta + raw_rows).hexdigest()
-            return ({"observed_at": observed.isoformat(), "data_healthy": meta["data_healthy"],
+            return ({"observed_at": observed.isoformat(), "data_healthy": meta["data_healthy"] and not excluded,
+                     **quality,
                      "source_sha256": digest, "cached_seconds_max": 1,
                      "interpretation": (("historical_gate_conditioned_result" if provenance['kind'] == 'historical_gate_backfill_v2'
                                          else "historical_archive_final_result") if provenance else "published_monitor_result"),
