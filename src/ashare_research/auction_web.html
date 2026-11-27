@@ -20,6 +20,7 @@ main{padding-top:12px;padding-bottom:24px;display:grid;gap:10px;min-width:0}.kpi
 .prior{border-top:3px solid var(--purple)}.prior h2{padding:9px 12px;color:var(--purple)}details{padding:8px 12px}summary{cursor:pointer}
 dialog{border:1px solid var(--line);border-radius:10px;width:min(560px,calc(100% - 24px));max-height:88dvh;color:var(--ink);padding:0;overflow:auto}dialog::backdrop{background:#0f172a66}.dialogHead{justify-content:space-between;border-bottom:1px solid var(--line)}.dialogBody{padding:14px;display:grid;gap:12px}.account,.credential{padding:10px;border:1px solid var(--line);border-radius:7px}.account .segments{margin-top:6px}.credential{background:#fff5db;overflow-wrap:anywhere}.check{display:flex;align-items:center;gap:7px}.check input{min-height:auto}.qualityRows{margin:0;padding-left:22px;overflow-wrap:anywhere}
 @media(max-width:700px){.bar,main{padding-left:10px;padding-right:10px}.bar{gap:5px}.brand{flex:1 0 55%;margin:0}.identity{margin-left:0}.kpi,.toolbar{gap:6px 10px}.search{width:100%}.scroll{overflow-x:visible}table{white-space:normal;table-layout:fixed}th,td{padding:5px 3px;font-size:11px;overflow-wrap:anywhere}th:nth-child(1){width:8%}th:nth-child(2){width:14%}th:nth-child(3){width:18%}th:nth-child(8),td:nth-child(8){display:none}.mobileMeta{display:block;color:var(--muted);font-size:10px}}
+dialog[open]{position:fixed;inset:0;margin:auto}
 @media(max-width:700px){th.extra,td.extra{display:none}.mobileMeta small{display:block}}
 </style>
 </head>
@@ -91,6 +92,22 @@ const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'
 const pretty=day=>day.replace(/^(....)(..)(..)$/,'$1-$2-$3');
 const number=(value,digits)=>value==null?'—':Number(value).toLocaleString('zh-CN',{maximumFractionDigits:digits,minimumFractionDigits:digits});
 const option=(value,label)=>new Option(label,value);
+function showDialog(dialog){
+ if(typeof dialog.showModal==='function')dialog.showModal();
+ else dialog.setAttribute('open','');
+}
+function closeDialog(dialog){
+ if(typeof dialog.close==='function')dialog.close();
+ else if(dialog.hasAttribute('open')){
+  dialog.removeAttribute('open');
+  dialog.dispatchEvent(new Event('close'));
+ }
+}
+for(const dialog of document.querySelectorAll('dialog')){
+ dialog.querySelector('form[method="dialog"]').onsubmit=event=>{
+  event.preventDefault();closeDialog(dialog);
+ };
+}
 function clearCredential(){
  $('credential').hidden=true;
  $('credentialText').textContent='';
@@ -101,33 +118,47 @@ function resetData(){
  $('table').textContent='';$('history').textContent='';$('historyTitle').textContent='昨日 D-1 · 合格个股';
  for(const id of ['observed','total','exposure'])$(id).textContent='—';
  $('health').textContent='';$('notice').textContent='';$('pageInfo').textContent='';
- $('quality').hidden=true;$('qualityRows').textContent='';$('qualityDialog').close();
+ $('quality').hidden=true;$('qualityRows').textContent='';closeDialog($('qualityDialog'));
  $('previous').disabled=$('next').disabled=true;
 }
 function signOut(message=''){
  epoch++;sequence++;active?.abort();session=null;catalog=null;selectedStage=null;order=null;busy=false;
- viewCache.clear();resetData();clearCredential();$('accountsDialog').close();$('accounts').textContent='';
+ viewCache.clear();resetData();clearCredential();closeDialog($('accountsDialog'));$('accounts').textContent='';
  $('accountStatus').textContent='';$('createForm').reset();$('search').value='';$('date').replaceChildren();$('server').replaceChildren();
  $('password').value='';$('manageButton').hidden=true;$('appShell').hidden=true;$('boot').hidden=true;
  $('loginState').textContent=message;$('authGate').hidden=false;
 }
 async function api(path,{body,signal,silent=false}={}){
  const current=epoch;
- const response=await fetch(path,{method:body===undefined?'GET':'POST',credentials:'same-origin',cache:'no-store',
-  headers:body===undefined?{}:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),signal:signal??AbortSignal.timeout(15000)});
+ const controller=new AbortController();
+ const cancel=()=>controller.abort();
+ if(signal?.aborted)cancel();
+ else signal?.addEventListener('abort',cancel,{once:true});
+ let timedOut=false,response,data;
+ const timer=setTimeout(()=>{timedOut=true;cancel()},signal?18000:15000);
+ try{
+  response=await fetch(path,{method:body===undefined?'GET':'POST',credentials:'same-origin',cache:'no-store',
+   headers:body===undefined?{}:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),signal:controller.signal});
+  if(response.status!==401)data=await response.json();
+ }catch(error){
+  if(timedOut)throw new DOMException('请求超时，请重试。','TimeoutError');
+  if(error instanceof TypeError)throw new Error('连接网站失败，请检查网络后重试。');
+  throw error;
+ }finally{
+  clearTimeout(timer);signal?.removeEventListener('abort',cancel);
+ }
  if(current!==epoch)throw new DOMException('旧会话请求','AbortError');
  if(response.status===401){
   const message=path==='/api/auth/login'?'手机号或密码错误。':'登录已失效，请重新登录。可能已在另一台设备登录。';
   signOut(silent?'':message);
   throw new Error(message);
  }
- const data=await response.json();
  if(!response.ok)throw new Error(errors[data.error?.code]||'请求失败（'+(data.error?.code||response.status)+'）');
  return data;
 }
 function begin(){
  sequence++;active?.abort();active=new AbortController();
- return {id:sequence,session:epoch,signal:AbortSignal.any([active.signal,AbortSignal.timeout(18000)])};
+ return {id:sequence,session:epoch,signal:active.signal};
 }
 function current(task){return session&&task.id===sequence&&task.session===epoch}
 function setStage(preferred){
@@ -296,11 +327,11 @@ $('table').onclick=event=>{
 };
 $('previous').onclick=()=>result&&query(Math.max(0,result.offset-pageSize));
 $('next').onclick=()=>result&&query(result.offset+pageSize);
-$('qualityButton').onclick=()=>$('qualityDialog').showModal();
+$('qualityButton').onclick=()=>showDialog($('qualityDialog'));
 const actionNames={disable:'禁用',enable:'启用',reset:'重置密码',revoke:'踢出会话',promote:'设为管理员'};
 async function listAccounts(){
  const data=await api('/api/auth/accounts');
- if(!$('accountsDialog').open)return;
+ if(!$('accountsDialog').hasAttribute('open'))return;
  $('accounts').replaceChildren(...data.accounts.map(account=>{
   const item=document.createElement('div');item.className='account';
   const title=document.createElement('p');title.textContent=account.label+' · '+(account.active?'已启用':'已禁用')+' · '+(account.admin?'管理员':'受邀账号');
@@ -322,7 +353,7 @@ async function manageAccount(body,label){
  accountBusy=true;clearCredential();$('accountStatus').textContent='处理中…';
  try{
   const data=await api('/api/auth/accounts',{body});
-  if(!$('accountsDialog').open)return;
+  if(!$('accountsDialog').hasAttribute('open'))return;
   if(data.password){
    $('credentialText').textContent='账号 '+(body.phone||label)+' · 密码 '+data.password;
    $('credential').hidden=false;
@@ -333,7 +364,7 @@ async function manageAccount(body,label){
  finally{accountBusy=false}
 }
 $('manageButton').onclick=async()=>{
- $('accountsDialog').showModal();$('accountStatus').textContent='正在读取账号…';
+ showDialog($('accountsDialog'));$('accountStatus').textContent='正在读取账号…';
  try{await listAccounts();$('accountStatus').textContent=''}
  catch(error){if(session)$('accountStatus').textContent=error.message}
 };
@@ -347,7 +378,7 @@ $('copy').onclick=async()=>{
  try{await navigator.clipboard.writeText($('credentialText').textContent);$('accountStatus').textContent='已复制。'}
  catch(error){$('accountStatus').textContent='无法自动复制，请选中文字复制。'}
 };
-$('accountsDialog').onclose=()=>{clearCredential();$('createForm').reset();$('accounts').textContent='';$('accountStatus').textContent=''};
+$('accountsDialog').addEventListener('close',()=>{clearCredential();$('createForm').reset();$('accounts').textContent='';$('accountStatus').textContent=''});
 window.addEventListener('pagehide',()=>{$('password').value='';clearCredential();viewCache.clear();active?.abort()});
 checkLogin(true);
 </script>
