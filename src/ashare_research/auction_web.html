@@ -67,7 +67,7 @@ dialog[open]{position:fixed;inset:0;margin:auto}
   <select id="server" aria-label="服务器" hidden></select>
   <select id="date" aria-label="交易日"></select>
   <div class="segments" aria-label="竞价阶段">
-   <button data-stage="0915">09:15 门帧</button><button data-stage="0920">09:20 门帧</button><button data-stage="final">09:25 冻结</button>
+   <button data-stage="0915">09:15 门帧</button><button data-stage="0920">09:20 门帧</button><button data-stage="final">09:25 冻结</button><button data-stage="history" hidden>09:25 历史重筛</button>
   </div>
   <button id="refresh">刷新</button><span id="health" class="muted" role="status"></span>
   <span id="identity" class="identity"></span><button id="manageButton" hidden>账号管理</button><button id="logoutButton">退出登录</button>
@@ -264,10 +264,11 @@ function availableStages(){
 function setStage(preferred){
  const available=availableStages();
  const endStage=available.includes('final')?'final':available.includes('history')?'history':null;
- if(preferred==='final'||preferred==='history')preferred=endStage;
+ if(preferred==='final')preferred=endStage;
  selectedStage=available.includes(preferred)?preferred:stageOrder.find(stage=>available.includes(stage))??null;
  for(const button of stages){
   const stage=button.dataset.stage==='final'?endStage:button.dataset.stage;
+  if(button.dataset.stage==='history')button.hidden=!(available.includes('final')&&available.includes('history'));
   if(button.dataset.stage==='final')button.textContent=labels[endStage]??labels.final;
   button.disabled=!available.includes(stage);
   button.setAttribute('aria-pressed',String(stage!==null&&stage===selectedStage));
@@ -408,7 +409,8 @@ function showResult(data,prefix){
  $('observed').textContent=data.observed_at?.slice(11,19)||'—';
  $('total').textContent=data.total.toLocaleString();
  showPosition(data);
- $('notice').textContent=[prefix,historical?'09:25 历史重建。'+(historicalSources[data.provenance?.kind]??'请按历史重建范围解读。'):'',
+ $('notice').textContent=[prefix,historical?(data.recommendation_summary?.source==='expanded_pool'?'09:25 历史快照按当前规则重筛。':'09:25 历史重建。')+(historicalSources[data.provenance?.kind]??'请按历史重建范围解读。'):'',
+  data.display?.expanded_pool_review_gaps>0?'另有 '+data.display.expanded_pool_review_gaps+' 只股票缺少确认数据，未纳入选股池。':'',
   view==='qualified'&&data.recommendation_summary?.source==='expanded_pool'&&data.total>0?'扩展选股池包含待观察个股。':''].filter(Boolean).join(' ');
  showDataQuality(data);
  const prior=priorResult;

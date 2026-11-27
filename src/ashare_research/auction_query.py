@@ -182,8 +182,8 @@ class AuctionRankingReader:
             meta = json.loads(raw_meta)
             display = meta.get("display")
             if isinstance(display, dict) and "expanded_pool" in display:
-                if stage != "final":
-                    raise AuctionQueryError("DATA_INVALID: 扩展选股池必须绑定正式冻结")
+                if stage != "final" and (stage != "history" or not validate_provenance(meta.get("provenance"))):
+                    raise AuctionQueryError("DATA_INVALID: 扩展选股池必须绑定正式冻结或有来源标记的历史冻结")
                 from .auction_display import validate_expanded_pool
                 validate_expanded_pool(display["expanded_pool"])
             cycle_id = meta.get("cycle_id")

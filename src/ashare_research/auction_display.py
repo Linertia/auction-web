@@ -35,7 +35,7 @@ def validate_expanded_pool(value):
 
 
 def validate_display(value):
-    if not isinstance(value, dict) or not {"exposure_weight", "prior_trade_date"} <= set(value) or set(value) - {"exposure_weight", "prior_trade_date", "stock_names", "market_state", "market_timing", "frame_coverage", "expanded_pool"}:
+    if not isinstance(value, dict) or not {"exposure_weight", "prior_trade_date"} <= set(value) or set(value) - {"exposure_weight", "prior_trade_date", "stock_names", "market_state", "market_timing", "frame_coverage", "expanded_pool", "expanded_pool_review_gaps"}:
         raise AuctionQueryError("DATA_INVALID: 展示元数据无效")
     weight, prior = value["exposure_weight"], value["prior_trade_date"]
     if weight is not None and (type(weight) not in (int, float) or weight not in (.25, .5, 1)):
@@ -65,6 +65,11 @@ def validate_display(value):
             raise AuctionQueryError("DATA_INVALID: 股票名称无效")
     if "expanded_pool" in value:
         validate_expanded_pool(value["expanded_pool"])
+    if "expanded_pool_review_gaps" in value and (
+        "expanded_pool" not in value or type(value["expanded_pool_review_gaps"]) is not int
+        or not 0 <= value["expanded_pool_review_gaps"] <= 30
+    ):
+        raise AuctionQueryError("DATA_INVALID: 选股池待复核数量无效")
     return dict(value)
 
 
