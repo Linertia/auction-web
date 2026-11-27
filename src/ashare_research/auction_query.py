@@ -114,17 +114,30 @@ class AuctionRankingReader:
             raise AuctionQueryError("CODE_INVALID: 最多100个六位数字股票代码")
         meta, ranked, display = self._snapshot(server_id, trade_date, stage)
         wanted = set(codes or [])
-        if wanted and wanted - {row["code"] for row in ranked}:
+        pool = display.get("expanded_pool") if display_query and isinstance(display, dict) else None
+        members = {row["code"]: row for row in pool} if pool is not None else {}
+        if wanted and wanted - ({row["code"] for row in ranked} | members.keys()):
             raise AuctionQueryError("CODE_NOT_FOUND: 指定代码在该快照中没有有效数据")
-        rows = [row for row in ranked if (not wanted or row["code"] in wanted)
-                and (not qualified_only or row["qualified"])]
         summary = None
         if display_query:
             if stage in ("final", "history", "corrected"):
-                qualified = [row for row in ranked if row["qualified"]]
-                summary = {"total": len(qualified), "low_score": any(row["score"] < .5 for row in qualified)}
+                candidates = pool if pool is not None else [row for row in ranked if row["qualified"]]
+                summary = {"total": len(candidates), "low_score": any(row["score"] < .5 for row in candidates)}
+                if pool is not None:
+                    summary["source"] = "expanded_pool"
+        if pool is not None and qualified_only:
+            by_code = {row["code"]: row for row in ranked}
+            rows = [{**by_code.get(row["code"], {}), **row, "rank": row["original_rank"]}
+                    for row in pool if not wanted or row["code"] in wanted]
+        else:
+            rows = [row for row in ranked if (not wanted or row["code"] in wanted)
+                    and (not qualified_only or row["qualified"])]
             if sort_by is not None:
                 rows = self._book_rows(rows, server_id, trade_date, stage, sort_by)
+        if pool is not None and not qualified_only:
+            rows = [{**row, "in_recommended_pool": row["code"] in members,
+                     **({"original_rank": members[row["code"]]["original_rank"]} if row["code"] in members else {})}
+                    for row in rows]
         result = {**meta, "server_id": server_id, "trade_date": trade_date,
                   "stage": stage, "total": len(rows), "offset": offset,
                   "limit": limit, "rows": [dict(row) for row in rows[offset:offset + limit]]}
@@ -167,6 +180,12 @@ class AuctionRankingReader:
         try:
             raw_meta, raw_rows = self.store.read(server_id, trade_date, stage)
             meta = json.loads(raw_meta)
+            display = meta.get("display")
+            if isinstance(display, dict) and "expanded_pool" in display:
+                if stage != "final":
+                    raise AuctionQueryError("DATA_INVALID: 扩展选股池必须绑定正式冻结")
+                from .auction_display import validate_expanded_pool
+                validate_expanded_pool(display["expanded_pool"])
             cycle_id = meta.get("cycle_id")
             if not cycle_id and stage == "corrected" and meta.get("top30"):
                 cycle_id = meta["top30"][0]["cycle_id"]
@@ -251,7 +270,7 @@ class AuctionRankingReader:
                      "sampling_scope": (provenance["sampling_scope"] if provenance
                                         else "published_monitor_scope"),
                      **({"provenance": provenance} if provenance else {})},
-                    [public[row.code] for row in ranked], meta.get("display"))
+                    [public[row.code] for row in ranked], display)
         except AuctionQueryError:
             raise
         except (OSError, ValueError, TypeError, KeyError, csv.Error):

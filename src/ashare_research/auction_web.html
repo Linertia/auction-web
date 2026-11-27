@@ -17,7 +17,8 @@ header{position:sticky;top:0;z-index:2;background:var(--paper);border-bottom:1px
 .bar,main{max-width:1500px;margin:auto;padding:0 20px}.bar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding-top:9px;padding-bottom:9px}.brand{margin-right:10px}.identity{margin-left:auto;color:var(--muted)}.segments{display:flex;flex-wrap:wrap;gap:4px}
 main{padding-top:12px;padding-bottom:24px;display:grid;gap:10px;min-width:0}.kpi,.toolbar,.pagination,.dialogHead{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px;padding:9px 12px}.kpi{color:var(--muted)}.kpi strong{color:var(--ink);margin-left:5px}.toolbar{justify-content:space-between}.search{min-width:0;width:min(100%,220px)}.status{font-size:13px;color:var(--muted);overflow-wrap:anywhere}.warning{color:#854b10}.error{color:#a52532}.pagination{justify-content:flex-end}
 .scroll{overflow-x:auto;min-width:0;max-width:100%}table{width:100%;border-collapse:collapse;white-space:nowrap}th,td{text-align:right;padding:7px 10px;border-bottom:1px solid var(--line)}th{background:#f8fafc;color:var(--muted);font-weight:600}th button{min-height:0;padding:0;border:0;background:transparent;color:inherit;font-weight:inherit}th:nth-child(2),th:nth-child(3),td:nth-child(2),td:nth-child(3){text-align:left}tr.qualified{background:var(--green)}tr.qualified td:first-child{box-shadow:inset 3px 0 #21834d}.risk{background:#fdebed;color:#a51f31}.low{background:#fff1dc;color:#93480c}.empty{padding:20px;text-align:center;color:var(--muted)}.mobileMeta{display:none}
-.prior{border-top:3px solid var(--purple)}.prior h2{padding:9px 12px;color:var(--purple)}details{padding:8px 12px}summary{cursor:pointer}
+.prior{border-top:3px solid #475569}.prior h2{padding:9px 12px;color:#475569}details{padding:8px 12px}summary{cursor:pointer}
+tr.qualified{background:#f3edff}tr.qualified td:first-child{box-shadow:inset 3px 0 #6d28d9}
 dialog{border:1px solid var(--line);border-radius:10px;width:min(560px,calc(100% - 24px));max-height:88dvh;color:var(--ink);padding:0;overflow:auto}dialog::backdrop{background:#0f172a66}.dialogHead{justify-content:space-between;border-bottom:1px solid var(--line)}.dialogBody{padding:14px;display:grid;gap:12px}.account,.credential{padding:10px;border:1px solid var(--line);border-radius:7px}.account .segments{margin-top:6px}.credential{background:#fff5db;overflow-wrap:anywhere}.check{display:flex;align-items:center;gap:7px}.check input{min-height:auto}.qualityRows{margin:0;padding-left:22px;overflow-wrap:anywhere}
 @media(max-width:700px){.bar,main{padding-left:10px;padding-right:10px}.bar{gap:5px}.brand{flex:1 0 55%;margin:0}.identity{margin-left:0}.kpi,.toolbar{gap:6px 10px}.search{width:100%}.scroll{overflow-x:visible}table{white-space:normal;table-layout:fixed}th,td{padding:5px 3px;font-size:11px;overflow-wrap:anywhere}th:nth-child(1){width:8%}th:nth-child(2){width:14%}th:nth-child(3){width:18%}th:nth-child(8),td:nth-child(8){display:none}.mobileMeta{display:block;color:var(--muted);font-size:10px}}
 dialog[open]{position:fixed;inset:0;margin:auto}
@@ -38,10 +39,9 @@ dialog[open]{position:fixed;inset:0;margin:auto}
 .guide-legend{display:grid;gap:9px;margin:0;padding:0;list-style:none}
 .guide-legend li{display:grid;grid-template-columns:auto 1fr;align-items:start;gap:9px}
 .guide-chip{display:inline-block;border-radius:5px;padding:2px 7px;font-weight:700;white-space:nowrap}
-.guide-chip.green{background:var(--green);box-shadow:inset 3px 0 #21834d;padding-left:9px}
+.guide-chip.recommended{background:#f3edff;box-shadow:inset 3px 0 #6d28d9;padding-left:9px}
 .guide-example{background:#edf8f3;border-radius:7px;padding:8px 10px;margin:8px 0;color:var(--accent)}
 .guide-reminders{background:#faf7ed;padding:13px 16px}
-.guide-reminders ol{margin:0;padding-left:1.35em;display:grid;gap:6px}
 @media(max-width:700px){
  .guide{gap:12px;padding-top:12px}
  .guide-steps,.guide-pair{grid-template-columns:minmax(0,1fr)}
@@ -80,7 +80,7 @@ dialog[open]{position:fixed;inset:0;margin:auto}
   <div id="quality" class="kpi card warning" hidden><span id="qualitySummary"></span><button id="qualityButton" hidden>查看缺失明细</button></div>
   <section class="card" aria-label="竞价榜单">
    <div class="toolbar"><div class="segments" aria-label="榜单">
-    <button data-view="top" aria-pressed="true">竞价指数前30</button><button id="recommendTab" data-view="qualified" aria-pressed="false">当日股票推荐</button><button data-view="all" aria-pressed="false">主板封单排行</button>
+    <button data-view="top" aria-pressed="true">竞价指数前40</button><button id="recommendTab" data-view="qualified" aria-pressed="false">当日股票推荐</button><button data-view="all" aria-pressed="false">主板封单排行</button>
    </div><input id="search" class="search" aria-label="筛选当前页" placeholder="筛选当前页代码或名称"></div>
    <div id="bookControls" class="toolbar" hidden>
     <div class="segments" aria-label="封单方向"><button data-book="buy" aria-pressed="true">涨停封单（未匹配买）</button><button data-book="sell" aria-pressed="false">跌停封单（未匹配卖）</button></div>
@@ -95,26 +95,26 @@ dialog[open]{position:fixed;inset:0;margin:auto}
  <main id="guide" class="guide" hidden>
   <section class="card guide-intro" aria-labelledby="guideIntro">
    <h2 id="guideIntro">这个网站是干什么的？</h2>
-   <p>每天早上 09:15–09:25，系统从主板几千只股票里找出<strong>大跌之后突然有资金抢着买、可能反弹</strong>的股票，给出今天有没有值得关注的股票，以及资金怎么分的参考。跟着下面 4 步看就行。</p>
+   <p>每天早上开盘前，系统从主板挑出值得关注的股票放进选股池，并给出仓位参考。照着下面 4 步看就行。</p>
   </section>
   <section aria-labelledby="guideSteps">
    <h2 id="guideSteps">每天早上 4 步照着做</h2>
    <div class="guide-steps">
     <article class="card guide-step">
      <div class="step-heading"><span class="step-number">01</span><span class="step-time">09:15</span></div>
-     <h3>随便看看</h3><p>早上刚开始报价，09:20 前挂的单子可以撤掉，容易有假象。先看看，不急着做决定。</p>
+     <h3>看看就行</h3><p>09:20 前挂的单子可以撤，先看看，不用操作。</p>
     </article>
     <article class="card guide-step">
      <div class="step-heading"><span class="step-number">02</span><span class="step-time">09:20</span></div>
-     <h3>看谁在排队买</h3><p>09:20 到 09:25 不能撤单。点「主板封单排行」，看看哪些股票排队买入的金额在变多，感受一下今天市场热不热。排队金额还没成交。</p>
+     <h3>看资金态度</h3><p>点「主板封单排行」，看哪些股票排队买的金额在变多。09:20 到 09:25 不能撤单。</p>
     </article>
     <article class="card guide-step">
      <div class="step-heading"><span class="step-number">03</span><span class="step-time">09:25</span></div>
-     <h3>看「当日股票推荐」</h3><p>等当天结果出来，再打开推荐列表。<strong>有绿色整行</strong>就看看哪些股票入选，再按顶部的资金比例做准备。<strong>明确显示 0 只</strong>就休息。页面还在加载或提示缺数据时，先等结果。</p>
+     <h3>按选股池买</h3><p>点「当日股票推荐」。有紫色推荐股，按顶部仓位参考准备开盘买入；明确显示 0 只就空仓休息。</p>
     </article>
     <article class="card guide-step">
      <div class="step-heading"><span class="step-number">04</span><span class="step-time">下一个交易日</span></div>
-     <h3>第二天怎么卖</h3><p>如果今天买了，第二个交易日早上 09:25 看这只股票的新分数。<strong>低于 0.5</strong>就优先考虑早点卖；表现平稳，也按计划在当天收盘前处理。看不到分数时，别把空白当 0 分。</p>
+     <h3>持有两天怎么卖</h3><p>买入后拿到<strong>下一个交易日</strong>，早盘<strong>挂涨停价卖</strong>；还没成交，就在<strong>临近收盘时卖出</strong>。</p>
     </article>
    </div>
   </section>
@@ -122,26 +122,19 @@ dialog[open]{position:fixed;inset:0;margin:auto}
    <section class="card guide-detail" aria-labelledby="guideColors">
     <h2 id="guideColors">页面上的颜色是什么意思？</h2>
     <ul class="guide-legend">
-     <li><span class="guide-chip green">绿色整行</span><span><strong>推荐股票。</strong>通过了当天的筛选，可以重点看看这一行。</span></li>
-     <li><span class="guide-chip low">橙色格子</span><span><strong>偏弱提醒。</strong>推荐股票的分数低于 0.5 时会标橙。手里已有的股票，第二天先看新分数；今天新出的，先多看一眼。</span></li>
-     <li><span class="guide-chip risk">浅红格子</span><span><strong>风险提醒。</strong>这个数值落在风险较高的范围，多留意，别急着买。</span></li>
+     <li><span class="guide-chip recommended">紫色整行</span><span>今日推荐。选股池挑出的股票。</span></li>
+     <li><span class="guide-chip low">橙色提醒</span><span>偏弱提示。第 30–40 名，或推荐股分数低于 0.5。</span></li>
+     <li><span class="guide-chip risk">浅红格子</span><span>风险区。数值落在需要多留意的范围。</span></li>
     </ul>
    </section>
    <section class="card guide-detail" aria-labelledby="guideMoney">
     <h2 id="guideMoney">该买多少钱？</h2>
-    <p>先看顶部的「建议总仓位」，也就是这次计划拿出多少钱。<strong>没有推荐就用 0%</strong>；有多只，就把计划用的钱平均分给每只。</p>
-    <p class="guide-example"><strong>建议总仓位 50%，推荐 2 只</strong><br>手里准备了 10,000 元，这次计划用 5,000 元，平均每只 2,500 元，也就是每只各用 25%。</p>
-    <p>手里还有昨天买的股票，就先把这笔处理完，期间不额外买新股票。</p>
+    <p>看顶部「建议总仓位」，把计划用的钱平均分给推荐股。</p>
+    <p class="guide-example"><strong>建议 50%，推荐 2 只 → 每只 25%</strong><br>准备 10,000 元，每只用 2,500 元。</p>
+    <p>没有推荐用 0%。手里还有持仓，等卖完再买下一轮。</p>
    </section>
   </div>
-  <section class="card guide-reminders" aria-labelledby="guideReminders">
-   <h2 id="guideReminders">新手必看 3 条提醒</h2>
-   <ol>
-    <li><strong>没出推荐就休息。</strong>推荐明确为 0 只时，别去「竞价指数前30」里随便挑一只硬买。</li>
-    <li><strong>看实际能买到的价格。</strong>09:25 看到的是刚刚定下来的开盘价，之后不一定还能按这个价格买到。09:30 开盘后请看实际可成交的价格，别盲目追高。</li>
-    <li><strong>风险由自己承担。</strong>页面是按规则筛出的结果和历史记录，仅供研究和复盘，不构成投资建议或成交保证。请结合自己能承担的风险独立决定。</li>
-   </ol>
-  </section>
+  <p class="card guide-reminders muted">09:25 结果不保证按开盘价买到，开盘后请看实际可成交的价格。页面数据仅供策略研究参考，不构成投资建议。</p>
  </main>
 </div>
 <dialog id="qualityDialog"><div class="dialogHead"><h2>数据不足明细</h2><form method="dialog"><button>关闭</button></form></div><div class="dialogBody"><ul id="qualityRows" class="qualityRows"></ul></div></dialog>
@@ -323,8 +316,9 @@ function rowCell(row,key){
  if(key==='score')return number(value,3);
  if(key==='gap_pct')return signedValue(value,number(value,2)+'%');
  if(key==='turnover_pct')return value==null?'—':number(value,2)+'%';
- if(key==='qualified')return row.qualified?'通过':'—';
- if(key==='name')return esc(value||'—')+(row.qualified?'<span class="mobileMeta">通过</span>':'')
+ const recommended=row.in_recommended_pool??row.qualified;
+ if(key==='qualified')return recommended?'入选':'—';
+ if(key==='name')return esc(value||'—')+(recommended?'<span class="mobileMeta">入选</span>':'')
   +'<details class="mobileMeta"><summary>行情</summary>'+columns.slice(8).map(([field,label])=>'<small>'+label+' '+rowCell(row,field)+'</small>').join('')+'</details>';
  return esc(value);
 }
@@ -338,11 +332,13 @@ function tableHtml(rows,canSort=false){
   const direction=book?(bookSort===key?'descending':'none'):canSort&&order?.key===key?(order.desc?'descending':'ascending'):'none';
   return canSort&&(book?bookSorts:sortable).has(key)?'<th scope="col" aria-sort="'+direction+'"><button data-sort="'+key+'">'+label+(direction==='none'?' ↕':direction==='descending'?' ↓':' ↑')+'</button></th>':'<th scope="col" class="'+(!book&&extraFields.has(key)?'extra':'')+'">'+label+'</th>';
  }).join('');
- const body=rows.map(row=>'<tr class="'+(row.qualified?'qualified':'')+'">'+shown.map(([key])=>{
+ const body=rows.map(row=>'<tr class="'+((row.in_recommended_pool??row.qualified)?'qualified':'')+'">'+shown.map(([key])=>{
   const value=row[key];
   const risk=(key==='score'&&value>=.6&&value<=.8)||(key==='turnover_pct'&&value>=2&&value<=3);
-  const low=key==='score'&&row.qualified&&value!=null&&value<.5;
-  return '<td class="'+(!book&&extraFields.has(key)?'extra ':'')+(risk?'risk':low?'low':'')+'">'+rowCell(row,key)+'</td>';
+  const rankWarning=key==='rank'&&value>=30&&value<=40;
+  const low=key==='score'&&(row.in_recommended_pool??row.qualified)&&value!=null&&value<.5;
+  return '<td class="'+(!book&&extraFields.has(key)?'extra ':'')+(risk?'risk':low||rankWarning?'low':'')+'"'+
+   (rankWarning?' title="第 30–40 名 · 偏弱提醒"':'')+'>'+rowCell(row,key)+'</td>';
  }).join('')+'</tr>').join('');
  return '<table'+(book?' class="book"':'')+'><thead><tr>'+heading+'</tr></thead><tbody>'+body+'</tbody></table>';
 }
@@ -360,7 +356,7 @@ function showDataQuality(data){
  const q=data.data_quality,p=data.provenance;
  const notes=[];
  if(data.display?.frame_coverage!=null)notes.push('门帧采集覆盖 '+number(data.display.frame_coverage*100,1)+'%。');
- if(q?.excluded_row_count)notes.push(q.excluded_row_count+' 只数据不足，未参与排名与候选判断；前30只覆盖有效数据。');
+ if(q?.excluded_row_count)notes.push(q.excluded_row_count+' 只数据不足，未纳入主榜；前40只覆盖有效数据。');
  if(q?.unranked_observation_count)notes.push(q.unranked_observation_count+' 只未排名观察记录。');
  if(p?.excluded_row_count)notes.push('来源另有 '+p.excluded_row_count+' 条缺失记录。');
  if(p?.free_share_source_date&&!p.free_share_exact_date)notes.push('流通股本采用 '+pretty(p.free_share_source_date)+' 数据。');
@@ -412,7 +408,8 @@ function showResult(data,prefix){
  $('observed').textContent=data.observed_at?.slice(11,19)||'—';
  $('total').textContent=data.total.toLocaleString();
  showPosition(data);
- $('notice').textContent=[prefix,historical?'09:25 历史重建。'+(historicalSources[data.provenance?.kind]??'请按历史重建范围解读。'):''].filter(Boolean).join(' ');
+ $('notice').textContent=[prefix,historical?'09:25 历史重建。'+(historicalSources[data.provenance?.kind]??'请按历史重建范围解读。'):'',
+  view==='qualified'&&data.recommendation_summary?.source==='expanded_pool'&&data.total>0?'扩展选股池包含待观察个股。':''].filter(Boolean).join(' ');
  showDataQuality(data);
  const prior=priorResult;
  $('historyTitle').textContent='昨日 D-1 · 合格个股'+(prior?.trade_date?' · '+pretty(prior.trade_date):'');
@@ -424,7 +421,7 @@ function showResult(data,prefix){
 async function query(offset=0,force=false,prefix=''){
  if(!session||!selectedStage||!$('date').value)return;
  const task=begin();
- const args={trade_date:$('date').value,server_id:$('server').value||'local',stage:selectedStage,limit:view==='top'?30:pageSize,offset,qualified_only:view==='qualified'};
+ const args={trade_date:$('date').value,server_id:$('server').value||'local',stage:selectedStage,limit:view==='top'?40:pageSize,offset,qualified_only:view==='qualified'};
  if(view==='all')args.sort_by=bookSort;
  const dayKey=args.server_id+'/'+args.trade_date;
  const sameDay=priorKey===dayKey;

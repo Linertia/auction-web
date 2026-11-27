@@ -10,10 +10,32 @@ SORT_FIELDS = frozenset({
     "unmatched_buy_delta_yuan", "unmatched_sell_delta_yuan",
 })
 MARKET_STATE_WEIGHTS = {"normal": 1, "l1_low": .5, "h1_hot": .5, "both": .25}
+POOL_GROUPS = ("original", "opened", "pending", "s")
+POOL_NUMBERS = ("score", "gap_pct", "matched_amount_yuan", "turnover_pct")
+PUBLIC_NAME = re.compile(r"[\u4e00-\u9fffA-Za-z0-9 *().（）-]{1,32}")
+
+
+def validate_expanded_pool(value):
+    if not isinstance(value, list) or len(value) > 10000:
+        raise AuctionQueryError("DATA_INVALID: 扩展选股池格式无效")
+    codes = set()
+    previous_rank = 0
+    for row in value:
+        if (not isinstance(row, dict) or set(row) != {
+            "code", "name", "original_rank", "group", "in_recommended_pool", *POOL_NUMBERS
+        } or not isinstance(row["code"], str) or not re.fullmatch(r"[0-9]{6}", row["code"])
+            or row["code"] in codes or type(row["original_rank"]) is not int
+            or not previous_rank < row["original_rank"] <= 10000 or row["group"] not in POOL_GROUPS
+            or row["in_recommended_pool"] is not True or not isinstance(row["name"], str)
+            or (row["name"] and not PUBLIC_NAME.fullmatch(row["name"]))
+            or any(type(row[key]) not in (int, float) or not math.isfinite(row[key]) for key in POOL_NUMBERS)):
+            raise AuctionQueryError("DATA_INVALID: 扩展选股池明细无效")
+        codes.add(row["code"])
+        previous_rank = row["original_rank"]
 
 
 def validate_display(value):
-    if not isinstance(value, dict) or not {"exposure_weight", "prior_trade_date"} <= set(value) or set(value) - {"exposure_weight", "prior_trade_date", "stock_names", "market_state", "market_timing", "frame_coverage"}:
+    if not isinstance(value, dict) or not {"exposure_weight", "prior_trade_date"} <= set(value) or set(value) - {"exposure_weight", "prior_trade_date", "stock_names", "market_state", "market_timing", "frame_coverage", "expanded_pool"}:
         raise AuctionQueryError("DATA_INVALID: 展示元数据无效")
     weight, prior = value["exposure_weight"], value["prior_trade_date"]
     if weight is not None and (type(weight) not in (int, float) or weight not in (.25, .5, 1)):
@@ -39,14 +61,16 @@ def validate_display(value):
     if not isinstance(names, dict) or len(names) > 10000:
         raise AuctionQueryError("DATA_INVALID: 股票名称映射无效")
     for code, name in names.items():
-        if not isinstance(code, str) or not re.fullmatch(r"[0-9]{6}", code) or not isinstance(name, str) or not re.fullmatch(r"[\u4e00-\u9fffA-Za-z0-9 *().（）-]{1,32}", name):
+        if not isinstance(code, str) or not re.fullmatch(r"[0-9]{6}", code) or not isinstance(name, str) or not PUBLIC_NAME.fullmatch(name):
             raise AuctionQueryError("DATA_INVALID: 股票名称无效")
+    if "expanded_pool" in value:
+        validate_expanded_pool(value["expanded_pool"])
     return dict(value)
 
 
 def _display_rows(result, display):
     names = display.get("stock_names", {})
-    return [{**row, **({"name": names[row["code"]]} if row["code"] in names else {})}
+    return [{**row, **({"name": names[row["code"]]} if not row.get("name") and row["code"] in names else {})}
             for row in result["rows"]]
 
 
@@ -66,7 +90,8 @@ def read_display(reader, *args, include_previous=True, sort_by=None):
     prior = display["prior_trade_date"]
     if prior and prior >= day:
         raise AuctionQueryError("DATE_MISMATCH: 上一交易日必须早于查询日")
-    output = {**result, "rows": _display_rows(result, display), "display": display,
+    public_display = {key: value for key, value in display.items() if key != "expanded_pool"}
+    output = {**result, "rows": _display_rows(result, display), "display": public_display,
               "recommendation_summary": summary}
     if not include_previous:
         return output
