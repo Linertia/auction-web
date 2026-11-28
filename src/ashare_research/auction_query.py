@@ -140,8 +140,8 @@ class AuctionRankingReader:
         if pool is not None and not qualified_only:
             rows = [{**row, "in_recommended_pool": row["code"] in members,
                      **({"original_rank": members[row["code"]]["original_rank"]} if row["code"] in members else {}),
-                     **({"name_confirmation_required": True}
-                        if members.get(row["code"], {}).get("name_confirmation_required") else {})}
+                     **{key: True for key in ("name_confirmation_required", "name_status_unverified")
+                        if members.get(row["code"], {}).get(key)}}
                     for row in rows]
         result = {**meta, "server_id": server_id, "trade_date": trade_date,
                   "stage": stage, "total": len(rows), "offset": offset,

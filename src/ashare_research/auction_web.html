@@ -318,8 +318,9 @@ function rowCell(row,key){
  if(key==='gap_pct')return signedValue(value,number(value,2)+'%');
  if(key==='turnover_pct')return value==null?'—':number(value,2)+'%';
  const recommended=(row.in_recommended_pool??row.qualified)&&!row.name_confirmation_required;
- if(key==='qualified')return row.name_confirmation_required?'待确认':recommended?'入选':'—';
- if(key==='name')return esc(value||'—')+(row.name_confirmation_required?'<br><span class="low">ST · 请交易者确认名称</span>':'')
+ if(key==='qualified')return row.group==='pending'?'跌停待确认':row.name_confirmation_required?'待确认':recommended?'入选':'—';
+ const confirmationLabel=row.name_status_unverified?'名称 / ST 状态 · 请交易者确认':'ST · 请交易者确认名称';
+ if(key==='name')return esc(value||'—')+(row.name_confirmation_required?'<br><span class="low">'+confirmationLabel+'</span>':'')
   +(recommended?'<span class="mobileMeta">入选</span>':'')
   +'<details class="mobileMeta"><summary>行情</summary>'+columns.slice(8).map(([field,label])=>'<small>'+label+' '+rowCell(row,field)+'</small>').join('')+'</details>';
  return esc(value);
@@ -387,7 +388,7 @@ function showPosition(data){
  else{
   if(historical)notes.push('历史重建 · 仓位仅供复盘。');
   if(review)notes.push('市场状态为竞价后补算，仅供复盘。');
-  if(confirmationCount)notes.push('有 '+confirmationCount+' 只标记「ST · 请交易者确认名称」，请勿买入，不计入仓位分配。');
+  if(confirmationCount)notes.push('有 '+confirmationCount+' 只需人工核对名称和 ST 状态。当天确认已摘帽且符合交易资格后才考虑买入；仍为 ST 或状态未确认时不买入。标记项不计入系统分仓。');
   if(tradableCount===0){
    if(confirmationCount)notes.push('当前候选中无可分配仓位的标的 · 建议空仓观望。');
    else if(historical||!data.data_healthy)notes.push('当前快照范围内无推荐标的 · 建议空仓观望。');

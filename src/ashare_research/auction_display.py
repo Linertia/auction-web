@@ -21,13 +21,15 @@ def validate_expanded_pool(value):
     codes = set()
     previous_rank = 0
     for row in value:
-        if (not isinstance(row, dict) or set(row) - {"name_confirmation_required"} != {
+        if (not isinstance(row, dict) or set(row) - {"name_confirmation_required", "name_status_unverified"} != {
             "code", "name", "original_rank", "group", "in_recommended_pool", *POOL_NUMBERS
         } or not isinstance(row["code"], str) or not re.fullmatch(r"[0-9]{6}", row["code"])
             or row["code"] in codes or type(row["original_rank"]) is not int
             or not previous_rank < row["original_rank"] <= 10000 or row["group"] not in POOL_GROUPS
             or row["in_recommended_pool"] is not True or not isinstance(row["name"], str)
             or ("name_confirmation_required" in row and row["name_confirmation_required"] is not True)
+            or ("name_status_unverified" in row and (
+                row["name_status_unverified"] is not True or row.get("name_confirmation_required") is not True))
             or (row["name"] and not PUBLIC_NAME.fullmatch(row["name"]))
             or any(type(row[key]) not in (int, float) or not math.isfinite(row[key]) for key in POOL_NUMBERS)):
             raise AuctionQueryError("DATA_INVALID: 扩展选股池明细无效")
