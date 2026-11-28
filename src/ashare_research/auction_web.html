@@ -335,7 +335,7 @@ function tableHtml(rows,canSort=false){
  }).join('');
  const body=rows.map(row=>'<tr class="'+((row.in_recommended_pool??row.qualified)?'qualified':'')+'">'+shown.map(([key])=>{
   const value=row[key];
-  const risk=(key==='score'&&value>=.6&&value<=.8)||(key==='turnover_pct'&&value>=2&&value<=3);
+  const risk=key==='score'&&value>=.6&&value<=.8;
   const rankWarning=key==='rank'&&value>=30&&value<=40;
   const low=key==='score'&&(row.in_recommended_pool??row.qualified)&&value!=null&&value<.5;
   return '<td class="'+(!book&&extraFields.has(key)?'extra ':'')+(risk?'risk':low||rankWarning?'low':'')+'"'+
