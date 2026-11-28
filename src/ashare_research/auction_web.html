@@ -317,9 +317,10 @@ function rowCell(row,key){
  if(key==='score')return number(value,3);
  if(key==='gap_pct')return signedValue(value,number(value,2)+'%');
  if(key==='turnover_pct')return value==null?'—':number(value,2)+'%';
- const recommended=row.in_recommended_pool??row.qualified;
- if(key==='qualified')return recommended?'入选':'—';
- if(key==='name')return esc(value||'—')+(recommended?'<span class="mobileMeta">入选</span>':'')
+ const recommended=(row.in_recommended_pool??row.qualified)&&!row.name_confirmation_required;
+ if(key==='qualified')return row.name_confirmation_required?'待确认':recommended?'入选':'—';
+ if(key==='name')return esc(value||'—')+(row.name_confirmation_required?'<br><span class="low">ST · 请交易者确认名称</span>':'')
+  +(recommended?'<span class="mobileMeta">入选</span>':'')
   +'<details class="mobileMeta"><summary>行情</summary>'+columns.slice(8).map(([field,label])=>'<small>'+label+' '+rowCell(row,field)+'</small>').join('')+'</details>';
  return esc(value);
 }
@@ -333,11 +334,11 @@ function tableHtml(rows,canSort=false){
   const direction=book?(bookSort===key?'descending':'none'):canSort&&order?.key===key?(order.desc?'descending':'ascending'):'none';
   return canSort&&(book?bookSorts:sortable).has(key)?'<th scope="col" aria-sort="'+direction+'"><button data-sort="'+key+'">'+label+(direction==='none'?' ↕':direction==='descending'?' ↓':' ↑')+'</button></th>':'<th scope="col" class="'+(!book&&extraFields.has(key)?'extra':'')+'">'+label+'</th>';
  }).join('');
- const body=rows.map(row=>'<tr class="'+((row.in_recommended_pool??row.qualified)?'qualified':'')+'">'+shown.map(([key])=>{
+ const body=rows.map(row=>'<tr class="'+((row.in_recommended_pool??row.qualified)&&!row.name_confirmation_required?'qualified':'')+'">'+shown.map(([key])=>{
   const value=row[key];
   const risk=key==='score'&&value>=.6&&value<=.8;
   const rankWarning=key==='rank'&&value>=30&&value<=40;
-  const low=key==='score'&&(row.in_recommended_pool??row.qualified)&&value!=null&&value<.5;
+  const low=key==='score'&&(row.in_recommended_pool??row.qualified)&&!row.name_confirmation_required&&value!=null&&value<.5;
   return '<td class="'+(!book&&extraFields.has(key)?'extra ':'')+(risk?'risk':low||rankWarning?'low':'')+'"'+
    (rankWarning?' title="第 30–40 名 · 偏弱提醒"':'')+'>'+rowCell(row,key)+'</td>';
  }).join('')+'</tr>').join('');
@@ -373,6 +374,8 @@ function showDataQuality(data){
 }
 function showPosition(data){
  const summary=data.recommendation_summary;
+ const confirmationCount=summary?.name_confirmation_count??0;
+ const tradableCount=(summary?.total??0)-confirmationCount;
  const weight=data.display?.exposure_weight;
  const reason=marketLabels[data.display?.market_state]||'市场档位未发布';
  const review=data.display?.market_timing==='review_after_auction_started';
@@ -384,8 +387,10 @@ function showPosition(data){
  else{
   if(historical)notes.push('历史重建 · 仓位仅供复盘。');
   if(review)notes.push('市场状态为竞价后补算，仅供复盘。');
-  if(summary.total===0){
-   if(historical||!data.data_healthy)notes.push('当前快照范围内无推荐标的 · 建议空仓观望。');
+  if(confirmationCount)notes.push('有 '+confirmationCount+' 只标记「ST · 请交易者确认名称」，请勿买入，不计入仓位分配。');
+  if(tradableCount===0){
+   if(confirmationCount)notes.push('当前候选中无可分配仓位的标的 · 建议空仓观望。');
+   else if(historical||!data.data_healthy)notes.push('当前快照范围内无推荐标的 · 建议空仓观望。');
    else notes.push('当日无推荐标的 · 建议空仓观望。');
    if(weight!=null)notes.push(reason+' · 市场基准仓位 '+number(weight*100,0)+'%。');
    else if(historical)notes.push('该快照未发布市场仓位参数，请按说明页风控原则人工控制仓位。');
@@ -395,7 +400,7 @@ function showPosition(data){
    notes.push('该快照未发布市场仓位参数，请按说明页风控原则人工控制仓位。');
   }else{
    $('exposure').textContent=number(weight*100,0)+'%';
-   notes.push(reason+' · 单票等权仓位参考 '+number(weight*100/summary.total,1)+'%。');
+   notes.push(reason+' · 单票等权仓位参考 '+number(weight*100/tradableCount,1)+'%。');
   }
   if(summary.low_score)notes.push('含低承接预警标的，建议人工复核后再决定是否参与。');
  }

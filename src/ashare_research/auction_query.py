@@ -122,7 +122,10 @@ class AuctionRankingReader:
         if display_query:
             if stage in ("final", "history", "corrected"):
                 candidates = pool if pool is not None else [row for row in ranked if row["qualified"]]
-                summary = {"total": len(candidates), "low_score": any(row["score"] < .5 for row in candidates)}
+                tradable = [row for row in candidates if not row.get("name_confirmation_required")]
+                summary = {"total": len(candidates), "low_score": any(row["score"] < .5 for row in tradable)}
+                if len(tradable) != len(candidates):
+                    summary["name_confirmation_count"] = len(candidates) - len(tradable)
                 if pool is not None:
                     summary["source"] = "expanded_pool"
         if pool is not None and qualified_only:
@@ -136,7 +139,9 @@ class AuctionRankingReader:
                 rows = self._book_rows(rows, server_id, trade_date, stage, sort_by)
         if pool is not None and not qualified_only:
             rows = [{**row, "in_recommended_pool": row["code"] in members,
-                     **({"original_rank": members[row["code"]]["original_rank"]} if row["code"] in members else {})}
+                     **({"original_rank": members[row["code"]]["original_rank"]} if row["code"] in members else {}),
+                     **({"name_confirmation_required": True}
+                        if members.get(row["code"], {}).get("name_confirmation_required") else {})}
                     for row in rows]
         result = {**meta, "server_id": server_id, "trade_date": trade_date,
                   "stage": stage, "total": len(rows), "offset": offset,
